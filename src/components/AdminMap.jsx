@@ -15,6 +15,19 @@ L.Icon.Default.mergeOptions({
 
 const TRAIL_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
+// Function to calculate distance between two lat/lng coordinates in km
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; 
+}
+
 const AdminMap = () => {
     // --- STATE ---
     const [locations, setLocations] = useState({});
@@ -67,9 +80,28 @@ const AdminMap = () => {
 
                     Object.entries(historyData).forEach(([username, pushPoints]) => {
                         const points = [];
-                        Object.values(pushPoints).forEach(pt => {
+                        // Sort by timestamp if available to evaluate sequentially
+                        const sortedPt = Object.values(pushPoints).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+                        
+                        let lastValid = null;
+                        sortedPt.forEach(pt => {
                             if (pt.latitude && pt.longitude) {
-                                points.push([pt.latitude, pt.longitude]);
+                                if (!lastValid) {
+                                    points.push([pt.latitude, pt.longitude]);
+                                    lastValid = pt;
+                                } else {
+                                    const dist = getDistance(lastValid.latitude, lastValid.longitude, pt.latitude, pt.longitude);
+                                    // Calculate elapsed minutes
+                                    const timeDiffMins = Math.abs((pt.timestamp || 0) - (lastValid.timestamp || 0)) / 60000;
+                                    
+                                    // Reject GPS spikes: > 1.5km within 3 mins, OR anything completely drastic (> 5km chunk)
+                                    const isSpike = (timeDiffMins < 3 && dist > 1.5) || dist > 5;
+                                    
+                                    if (!isSpike) {
+                                        points.push([pt.latitude, pt.longitude]);
+                                        lastValid = pt;
+                                    }
+                                }
                             }
                         });
                         hydratedTrails[username] = points;
@@ -116,12 +148,20 @@ const AdminMap = () => {
                             const userTrail = nextTrails[key] || [];
                             const lastPoint = userTrail.length > 0 ? userTrail[userTrail.length - 1] : null;
 
-                            // Check movement > 5m
+                            // Check movement > 5m to avoid noise
                             if (!lastPoint || (Math.abs(lastPoint[0] - lat) > 0.00005 || Math.abs(lastPoint[1] - lng) > 0.00005)) {
-                                const updatedTrail = [...userTrail, newPoint];
-                                // We rely on Firebase History for persistence, but keep RAM buffer reasonable
-                                if (updatedTrail.length > 5000) updatedTrail.shift();
-                                nextTrails[key] = updatedTrail;
+                                let skip = false;
+                                if (lastPoint) {
+                                    const dist = getDistance(lastPoint[0], lastPoint[1], lat, lng);
+                                    if (dist > 1.5) skip = true; // Block abrupt >1.5km live jump
+                                }
+
+                                if (!skip) {
+                                    const updatedTrail = [...userTrail, newPoint];
+                                    // We rely on Firebase History for persistence, but keep RAM buffer reasonable
+                                    if (updatedTrail.length > 5000) updatedTrail.shift();
+                                    nextTrails[key] = updatedTrail;
+                                }
                             }
                         }
                     });
