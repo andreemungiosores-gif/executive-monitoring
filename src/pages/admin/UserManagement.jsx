@@ -1,178 +1,244 @@
 import React, { useState, useEffect } from 'react';
-import { ref, onValue, set, remove } from 'firebase/database';
-import { db } from '../../firebase';
+
+const apiUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
+
+const parseCSV = (csv) => {
+    const lines = csv.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    return lines.slice(1).map(line => {
+        // Basic split, assumes no commas inside values
+        const values = line.split(',');
+        return headers.reduce((obj, header, i) => {
+            obj[header] = values[i] !== undefined ? values[i].trim() : '';
+            return obj;
+        }, {});
+    });
+};
+
+const stringifyCSV = (data) => {
+    if (data.length === 0) return '';
+    const headers = Object.keys(data[0]);
+    const csv = [
+        headers.join(','),
+        ...data.map(row => headers.map(h => row[h] || '').join(','))
+    ].join('\n');
+    return csv;
+};
 
 const UserManagement = () => {
-    const [users, setUsers] = useState([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [allUsers, setAllUsers] = useState([]);
+    const [fileSha, setFileSha] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Form State
-    const [newUser, setNewUser] = useState({
-        username: '',
-        password: '',
-        name: ''
-    });
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [newSeller, setNewSeller] = useState({ nombre_corto: '', nombre_apellido: '', pass: '123' });
 
+    const [editingUserId, setEditingUserId] = useState(null);
+    const [editPassValue, setEditPassValue] = useState("");
+
+    // Load from GitHub on mount
     useEffect(() => {
-        const usersRef = ref(db, 'users');
-        const unsubscribe = onValue(usersRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                const userList = Object.entries(data).map(([key, val]) => ({
-                    ...val,
-                    id: key
-                }));
-                // Filter only executives for this view (or show all but highlight role)
-                const executives = userList.filter(u => u.role === 'executive');
-                setUsers(executives);
-            } else {
-                setUsers([]);
-            }
-        });
-        return () => unsubscribe();
+        loadUsers();
     }, []);
 
-    const handleCreateUser = async (e) => {
-        e.preventDefault();
-
-        // Simple validation
-        if (!newUser.username || !newUser.password || !newUser.name) return;
-
-        // Clean username
-        const cleanUsername = newUser.username.trim().replace(/[.#$\[\]]/g, "");
-
+    const loadUsers = async () => {
+        setIsLoading(true);
         try {
-            await set(ref(db, `users/${cleanUsername}`), {
-                username: cleanUsername,
-                pass: newUser.password,
-                name: newUser.name,
-                role: 'executive',
-                createdAt: Date.now()
+            const token = import.meta.env.VITE_GITHUB_TOKEN;
+            if (!token) throw new Error("Falta el TOKEN de Github en las variables de entorno.");
+
+            const res = await fetch(apiUrl, {
+                headers: { 'Authorization': `token ${token}` }
+            });
+            if (!res.ok) throw new Error("Error al obtener el archivo desde Github.");
+            
+            const json = await res.json();
+            setFileSha(json.sha);
+            
+            const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
+            let parsed = parseCSV(decodedContent);
+            
+            // Check and add 'pass' column if missing
+            parsed = parsed.map(u => {
+                if (typeof u.pass === 'undefined') {
+                    u.pass = "123";
+                }
+                return u;
+            });
+            
+            setAllUsers(parsed);
+        } catch (e) {
+            console.error(e);
+            alert("Error: " + e.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const saveToGitHub = async (updatedDataStr) => {
+        try {
+            const token = import.meta.env.VITE_GITHUB_TOKEN;
+            const contentEncoded = window.btoa(unescape(encodeURIComponent(updatedDataStr)));
+
+            const response = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: 'Update users.csv passwords and accounts via Dashboard',
+                    content: contentEncoded,
+                    sha: fileSha
+                })
             });
 
-            setIsModalOpen(false);
-            setNewUser({ username: '', password: '', name: '' });
-            alert("Usuario creado exitosamente");
-        } catch (error) {
-            alert("Error al crear usuario: " + error.message);
+            if (!response.ok) throw new Error("Error al hacer push o el archivo fue modificado externamente.");
+
+            const json = await response.json();
+            setFileSha(json.content.sha); // Update hash for future saves
+            return true;
+        } catch (e) {
+            console.error(e);
+            alert("No se pudo guardar en GitHub: " + e.message);
+            return false;
         }
     };
 
-    const handleDeleteUser = async (userId) => {
-        if (confirm(`¿Estás seguro de eliminar a ${userId}?`)) {
-            await remove(ref(db, `users/${userId}`));
-        }
+    const handleCreateSeller = async (e) => {
+        e.preventDefault();
+        if (!newSeller.nombre_corto || !newSeller.nombre_apellido) return;
+
+        // Generate random 24 char hex ID to match standard structure
+        const randomId = [...Array(24)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+
+        const newUserObj = {
+            id_usuario: randomId,
+            nombre_corto: newSeller.nombre_corto,
+            nombre_apellido: newSeller.nombre_apellido,
+            is_active: 'True',
+            rol: 'reporteador',
+            pass: newSeller.pass
+        };
+
+        const updatedList = [...allUsers, newUserObj];
+        setAllUsers(updatedList);
+        
+        setIsAddModalOpen(false);
+        setNewSeller({ nombre_corto: '', nombre_apellido: '', pass: '123' });
+
+        const csvString = stringifyCSV(updatedList);
+        const success = await saveToGitHub(csvString);
+        if (success) alert("Vendedor creado y sincronizado a GitHub con éxito.");
     };
+
+    const savePasswordEdit = async (userObj) => {
+        const updatedList = allUsers.map(u => {
+            if (u.id_usuario === userObj.id_usuario) {
+                return { ...u, pass: editPassValue };
+            }
+            return u;
+        });
+
+        setAllUsers(updatedList);
+        setEditingUserId(null);
+
+        const csvString = stringifyCSV(updatedList);
+        await saveToGitHub(csvString);
+    };
+
+    // Filter to show only active sellers
+    const displaySellers = allUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
 
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Gestión de Vendedores</h2>
-                    <p className="text-gray-500">Administra las cuentas de acceso para los ejecutivos.</p>
+                    <h2 className="text-2xl font-bold text-gray-800">Gestión de Vendedores (Sincronizado)</h2>
+                    <p className="text-gray-500">Conectado en vivo con GitHub: `users.csv`</p>
                 </div>
                 <button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => setIsAddModalOpen(true)}
+                    disabled={isLoading}
                     className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-red-200 transition-all flex items-center gap-2"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Nuevo Vendedor
+                    {isLoading ? "Cargando..." : "+ Nuevo Vendedor"}
                 </button>
             </div>
 
-            {/* Users Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {users.map((user) => (
-                    <div key={user.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center relative hover:shadow-md transition-shadow">
-                        <div className="w-16 h-16 bg-gradient-to-br from-red-100 to-red-50 rounded-full flex items-center justify-center text-2xl mb-3 text-red-600 font-bold">
-                            {user.name.charAt(0)}
+            {isLoading ? (
+                <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div></div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {displaySellers.map((user) => (
+                        <div key={user.id_usuario} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col relative hover:shadow-md transition-shadow">
+                            
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-red-50 rounded-full flex items-center justify-center text-xl text-red-600 font-bold shrink-0">
+                                    {(user.nombre_corto || "U")[0]}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="font-bold text-gray-800 truncate" title={user.nombre_apellido}>{user.nombre_apellido}</h3>
+                                    <p className="text-xs text-gray-400 font-mono truncate">{user.id_usuario}</p>
+                                </div>
+                            </div>
+
+                            <div className="w-full bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-100">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 text-xs font-semibold uppercase">Contraseña</span>
+                                    {editingUserId === user.id_usuario ? (
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                autoFocus
+                                                type="text" 
+                                                value={editPassValue} 
+                                                className="w-20 px-2 py-1 text-xs border rounded outline-none"
+                                                onChange={(e) => setEditPassValue(e.target.value)}
+                                            />
+                                            <button onClick={() => savePasswordEdit(user)} className="text-green-600 font-bold hover:text-green-800">✓</button>
+                                            <button onClick={() => setEditingUserId(null)} className="text-red-600 font-bold hover:text-red-800">✕</button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-gray-700 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200">
+                                                {user.pass}
+                                            </span>
+                                            <button onClick={() => { setEditingUserId(user.id_usuario); setEditPassValue(user.pass); }} className="text-blue-500 hover:text-blue-700" title="Editar Contraseña">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 text-xs font-semibold uppercase">Estado</span>
+                                    <span className="text-green-600 text-xs font-bold bg-green-100 px-2 py-0.5 rounded-full">Activo</span>
+                                </div>
+                            </div>
                         </div>
-                        <h3 className="font-bold text-gray-800 text-lg">{user.name}</h3>
-                        <p className="text-sm text-gray-400 font-mono mb-4">@{user.username}</p>
+                    ))}
+                </div>
+            )}
 
-                        <div className="w-full bg-gray-50 rounded-lg p-3 mb-4">
-                            <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                <span>Contraseña:</span>
-                                <span className="font-mono text-gray-700">{user.pass}</span>
-                            </div>
-                            <div className="flex justify-between text-xs text-gray-500">
-                                <span>Estado:</span>
-                                <span className="text-green-500 font-semibold">Activo</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-400 hover:text-red-600 text-xs font-semibold flex items-center gap-1 transition-colors"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            Eliminar Usuario
-                        </button>
-                    </div>
-                ))}
-
-                {/* Empty State */}
-                {users.length === 0 && (
-                    <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
-                        No hay vendedores registrados aún.
-                    </div>
-                )}
-            </div>
-
-            {/* Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-gray-800">Registrar Nuevo Vendedor</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleCreateUser} className="space-y-4">
+            {/* Nuevo Vendedor Modal */}
+            {isAddModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000]">
+                    <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4">Crear Vendedor</h3>
+                        <p className="text-sm text-gray-500 mb-4">Se creará con un ID único y la contraseña "123" por defecto directamente en Github.</p>
+                        <form onSubmit={handleCreateSeller} className="space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nombre Completo</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-3 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-red-500 transition-all outline-none"
-                                    placeholder="Ej. Juan Perez"
-                                    value={newUser.name}
-                                    onChange={e => setNewUser({ ...newUser, name: e.target.value })}
-                                    required
-                                />
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Corto (Ej. Juan Perez)</label>
+                                <input type="text" value={newSeller.nombre_corto} onChange={e => setNewSeller({...newSeller, nombre_corto: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-red-500" required />
                             </div>
-
                             <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Usuario (Login)</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-3 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-red-500 transition-all outline-none"
-                                    placeholder="Ej. jperez"
-                                    value={newUser.username}
-                                    onChange={e => setNewUser({ ...newUser, username: e.target.value })}
-                                    required
-                                />
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
+                                <input type="text" value={newSeller.nombre_apellido} onChange={e => setNewSeller({...newSeller, nombre_apellido: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-red-500" required />
                             </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Contraseña</label>
-                                <input
-                                    type="text"
-                                    className="w-full p-3 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-red-500 transition-all outline-none"
-                                    placeholder="Contraseña de acceso"
-                                    value={newUser.password}
-                                    onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-                                    required
-                                />
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
+                                <button type="submit" className="px-4 py-2 font-bold bg-red-600 text-white rounded-lg hover:bg-red-700">Autorizar y Crear</button>
                             </div>
-
-                            <button
-                                type="submit"
-                                className="w-full bg-red-600 text-white font-bold py-3.5 rounded-xl hover:bg-red-700 transition-colors shadow-lg shadow-red-200 mt-4"
-                            >
-                                Crear Usuario
-                            </button>
                         </form>
                     </div>
                 </div>
