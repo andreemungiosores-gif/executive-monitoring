@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Force Light Mode for Map Tiles */
+.leaflet-container {
+    background: #fff !important;
+    filter: none !important;
+}
+img.leaflet-tile {
+    filter: none !important;
+}
+@media (prefers-color-scheme: dark) {
+    .leaflet-container {
+        filter: invert(1) hue-rotate(180deg) brightness(0.95);
+    }
+    img.leaflet-tile {
+        filter: invert(1) hue-rotate(180deg) brightness(1.1);
+    }
+}
+/* Wait, the user WANTS LIGHT mode. So we must UN-INVERT if the system is doing it automatically */
+@media (prefers-color-scheme: dark) {
+    /* Ensure no inversion happens if system forces dark mode on webview */
+    :root {
+        color-scheme: light;
+    }
+}

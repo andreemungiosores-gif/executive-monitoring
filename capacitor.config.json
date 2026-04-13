@@ -1,0 +1,10 @@
+{
+  "appId": "com.gravity.geotracker",
+  "appName": "Geo Tracker",
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
