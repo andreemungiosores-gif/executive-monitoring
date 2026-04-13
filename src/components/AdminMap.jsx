@@ -97,7 +97,10 @@ const AdminMap = () => {
                                     // Reject GPS spikes: > 1.5km within 3 mins, OR anything completely drastic (> 5km chunk)
                                     const isSpike = (timeDiffMins < 3 && dist > 1.5) || dist > 5;
                                     
-                                    if (!isSpike) {
+                                    // Reject GPS stationary drift / spiderwebbing (< 25 meters logic)
+                                    const isDrift = dist < 0.025;
+                                    
+                                    if (!isSpike && !isDrift) {
                                         points.push([pt.latitude, pt.longitude]);
                                         lastValid = pt;
                                     }
@@ -154,6 +157,7 @@ const AdminMap = () => {
                                 if (lastPoint) {
                                     const dist = getDistance(lastPoint[0], lastPoint[1], lat, lng);
                                     if (dist > 1.5) skip = true; // Block abrupt >1.5km live jump
+                                    if (dist < 0.025) skip = true; // Block stationary GPS drift/spiderwebbing (<25m)
                                 }
 
                                 if (!skip) {
