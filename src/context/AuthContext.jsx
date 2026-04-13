@@ -29,24 +29,54 @@ export const AuthProvider = ({ children }) => {
                     return finishLogin(userData, resolve);
                 }
 
-                // 2. Check Firebase for Executives
-                const dbRef = ref(db);
-                // We use cleanUsername logic matching UserManagement creation
-                const cleanUsername = username.trim().replace(/[.#$\[\]]/g, "");
+                // 2. Check GitHub Users CSV
+                const apiUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
+                const token = import.meta.env.VITE_GITHUB_TOKEN;
+                
+                if (!token) throw new Error("Contacta a soporte, Token no integrado en el Build.");
 
-                const snapshot = await get(child(dbRef, `users/${cleanUsername}`));
+                const res = await fetch(apiUrl, { headers: { 'Authorization': `token ${token}` } });
+                if (!res.ok) throw new Error("Error conectando con base de datos de usuarios.");
 
-                if (snapshot.exists()) {
-                    const userData = snapshot.val();
-                    // Check password (In prod, use Hashing. MVP: Plaintext match)
-                    if (userData.pass === password) {
-                        const fullUser = { ...userData, username: cleanUsername };
+                const json = await res.json();
+                const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
+                
+                const lines = decodedContent.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                const parsedUsers = lines.slice(1).map(line => {
+                    const values = line.split(',');
+                    return headers.reduce((obj, header, i) => {
+                        obj[header] = values[i] !== undefined ? values[i].trim() : '';
+                        return obj;
+                    }, {});
+                });
+
+                // Encontrar al usuario usando la columna nombre_apellido (es sensible a mayúsculas/minúsculas o podemos forzar lower)
+                const foundUser = parsedUsers.find(u => u.nombre_apellido.trim() === username.trim());
+
+                if (foundUser) {
+                    const validPass = foundUser.pass || "123";
+                    if (validPass === password) {
+                        if (foundUser.is_active !== 'True' && foundUser.is_active !== 'true') {
+                            throw new Error("El usuario está desactivado por un supervisor");
+                        }
+
+                        // Utilizamos el nombre_corto sanitizado para Firebase history keys (sin caracteres ilegales)
+                        const safeKey = (foundUser.nombre_corto || foundUser.nombre_apellido).trim().replace(/[.#$\[\]]/g, "");
+                        
+                        const fullUser = { 
+                            username: safeKey,
+                            name: foundUser.nombre_apellido,
+                            id: foundUser.id_usuario,
+                            role: foundUser.rol === 'supervisor' ? 'admin' : 'executive',
+                            pass: validPass
+                        };
                         return finishLogin(fullUser, resolve);
                     } else {
                         throw new Error("Contraseña incorrecta");
                     }
                 } else {
-                    throw new Error("Usuario no encontrado");
+                    throw new Error("Usuario no encontrado en la base maestra");
                 }
             } catch (error) {
                 reject(error);
