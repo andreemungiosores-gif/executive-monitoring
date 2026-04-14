@@ -198,16 +198,16 @@ const VisitForm = () => {
 
             // Dictionaries for mapping the values to full user-readable text for the CSV and Native Share
             const estadoMap = {
-                'no_interes': 'No interés en la marca',
-                'interes': 'Interés en la marca',
-                'en_proceso': 'En proceso de seguimiento',
-                'compra_potencial': 'Compra potencial',
-                'venta_concretada': 'Venta concretada'
+                'no_interes': 'NO INTERÉS EN LA MARCA',
+                'interes': 'INTERÉS EN LA MARCA',
+                'en_proceso': 'EN PROCESO SEGUIMIENTO',
+                'compra_potencial': 'COMPRA POTENCIAL',
+                'venta_concretada': 'VENTA CONCRETADA'
             };
             const recMap = {
-                'efectiva': 'EFECTIVA (Contacto con médico)',
-                'positiva': 'POSITIVA (Avance sin contacto)',
-                'negativa': 'NEGATIVA (Sin contacto relevante)'
+                'efectiva': 'EFECTIVA: Contacto con Médico',
+                'positiva': 'POSITIVA: Avance pero sin contacto con médico',
+                'negativa': 'NEGATIVA: No hubo contacto relevante'
             };
 
             const fullEstadoStr = estadoMap[estado] || estado;
@@ -339,11 +339,11 @@ const VisitForm = () => {
                         className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl py-3 px-4 focus:ring-2 focus:ring-red-500 focus:outline-none appearance-none font-medium"
                     >
                         <option value="" disabled>Seleccione una opción...</option>
-                        <option value="no_interes">No interés en la marca</option>
-                        <option value="interes">Interés en la marca</option>
-                        <option value="en_proceso">En proceso de seguimiento</option>
-                        <option value="compra_potencial">Compra potencial</option>
-                        <option value="venta_concretada">Venta concretada</option>
+                        <option value="no_interes">NO INTERÉS EN LA MARCA</option>
+                        <option value="interes">INTERÉS EN LA MARCA</option>
+                        <option value="en_proceso">EN PROCESO SEGUIMIENTO</option>
+                        <option value="compra_potencial">COMPRA POTENCIAL</option>
+                        <option value="venta_concretada">VENTA CONCRETADA</option>
                     </select>
                 </div>
 
@@ -359,8 +359,8 @@ const VisitForm = () => {
                         className="w-full bg-gray-50 border border-gray-200 text-gray-800 rounded-xl py-3 px-4 focus:ring-2 focus:ring-red-500 focus:outline-none appearance-none font-medium"
                     >
                         <option value="" disabled>Seleccione una opción...</option>
-                        <option value="efectiva">EFECTIVA: Contacto con médico</option>
-                        <option value="positiva">POSITIVA: Avance sin contacto</option>
+                        <option value="efectiva">EFECTIVA: Contacto con Médico</option>
+                        <option value="positiva">POSITIVA: Avance pero sin contacto con médico</option>
                         <option value="negativa">NEGATIVA: No hubo contacto relevante</option>
                     </select>
                 </div>
