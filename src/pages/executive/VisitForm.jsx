@@ -5,6 +5,34 @@ import { ref, update } from 'firebase/database';
 import { db } from '../../firebase';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Share } from '@capacitor/share';
+import { Geolocation } from '@capacitor/geolocation';
+
+const formatDateStr = (dateVal) => {
+    // Expected Output: "2025-08-13 18:19:47"
+    const d = new Date(dateVal);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+const formatTimeDiff = (start, end) => {
+    let diff = Math.floor((end - start) / 1000);
+    if (diff < 0) diff = 0;
+    const h = Math.floor(diff / 3600);
+    const m = Math.floor((diff % 3600) / 60);
+    const s = diff % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+};
+
+const escapeCSV = (str) => {
+    if (!str) return "";
+    let s = String(str);
+    s = s.replace(/"/g, '""');
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return `"${s}"`;
+    }
+    return s;
+};
 
 const VisitForm = () => {
     const { id } = useParams();
@@ -30,6 +58,87 @@ const VisitForm = () => {
     }
 
     const { pdvName } = visit;
+
+    const uploadPhotoToGithub = async (photo, userId) => {
+        const token = import.meta.env.VITE_GITHUB_TOKEN;
+        
+        // Convert to Blob then Base64
+        const response = await fetch(photo.webPath);
+        const blob = await response.blob();
+        
+        const base64Data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result.replace(/^data:.+;base64,/, '');
+                resolve(base64String);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+
+        const timestamp = Date.now();
+        const filename = `visita_${userId}_${timestamp}.jpg`;
+        const apiUrl = `https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/photos_users/${filename}`;
+        
+        const putRes = await fetch(apiUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: `upload: photo ${filename}`,
+                content: base64Data
+            })
+        });
+        
+        if (!putRes.ok) throw new Error("Error subiendo foto a GitHub");
+        
+        return `/db/photos_users/${filename}`;
+    };
+
+    const uploadCSVToGithub = async (csvRow) => {
+        const token = import.meta.env.VITE_GITHUB_TOKEN;
+        const repoUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/visits_reports.csv';
+
+        const getRes = await fetch(repoUrl, { headers: { 'Authorization': `token ${token}` } });
+        if (!getRes.ok) throw new Error("Error leyendo visits_reports.csv");
+
+        const json = await getRes.json();
+        const sha = json.sha;
+
+        const binaryStr = window.atob(json.content.replace(/\n/g, ''));
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const decoder = new TextDecoder('utf-8');
+        const decodedContent = decoder.decode(bytes);
+
+        const newCsv = decodedContent.trim() + '\n' + csvRow;
+
+        const encoder = new TextEncoder();
+        const encodedBytes = encoder.encode(newCsv);
+        let binStr = "";
+        for(let i=0; i<encodedBytes.length; i++) binStr += String.fromCharCode(encodedBytes[i]);
+        const base64Payload = window.btoa(binStr);
+
+        const putRes = await fetch(repoUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: `add: visit report csv row`,
+                content: base64Payload,
+                sha: sha
+            })
+        });
+
+        if (!putRes.ok) throw new Error("Error grabando registro en visits_reports.csv");
+    };
 
     const handleSubmit = async (e) => {
         if (e && e.preventDefault) e.preventDefault();
@@ -59,13 +168,58 @@ const VisitForm = () => {
         const todayStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
 
         try {
-            // Only updating status to 'in_progress' and checkInTime per request (form data is not stored yet)
+            // Update firebase real-time UI tracking locally
             await update(ref(db, `assignments/${todayStr}/${user.username}/${id}`), {
                 status: 'in_progress',
                 checkInTime: Date.now()
             });
 
-            // Dictionary for better readable mapping
+            // GITHUB REPORT COMPOSITION:
+            const startMs = location.state?.fechaInicioForm || Date.now();
+            const endMs = Date.now();
+            const startStr = formatDateStr(startMs);
+            const endStr = formatDateStr(endMs);
+            const timeDiff = formatTimeDiff(startMs, endMs);
+
+            let lat = "";
+            let lng = "";
+            try {
+                const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                lat = position.coords.latitude;
+                lng = position.coords.longitude;
+            } catch(e) {
+                console.warn("GPS falló al capturar coordenadas exactas", e);
+            }
+
+            // Upload photo to Github
+            const photoUrl = await uploadPhotoToGithub(photoData, user.id);
+
+            // Construct row payload
+            const rowArr = [
+                startStr,
+                endStr,
+                timeDiff,
+                lat,
+                lng,
+                "", // distancia_pdv_metros
+                "Reporte de Visita",
+                "", // ID PDV
+                visit.id || "", // id_pdv
+                user.id || "", // id_usuario
+                photoUrl,
+                comentario,
+                recepcion,
+                estado,
+                "", // tematica_visita
+                ""  // is_llm_categorized
+            ];
+
+            const csvRow = rowArr.map(escapeCSV).join(',');
+
+            // Append row to Github CSV
+            await uploadCSVToGithub(csvRow);
+
+            // NATIVE SHARE (WhatsApp Backup)
             const estadoMap = {
                 'no_interes': 'No interés en la marca',
                 'interes': 'Interés en la marca',
@@ -81,9 +235,7 @@ const VisitForm = () => {
 
             const reportText = `📍 *Visita:* ${pdvName}\n👤 *Ejecutivo:* ${user.name}\n📋 *Estado:* ${estadoMap[estado]}\n🤝 *Recepción:* ${recMap[recepcion]}\n💬 *Comentario:* ${comentario.trim()}`;
 
-            // Trigger Native Share
             try {
-                // Ensure we pass a native file URI (file://...) which is stored in photoData.path on Android
                 await Share.share({
                     title: 'Reporte de Visita',
                     text: reportText,
@@ -91,15 +243,13 @@ const VisitForm = () => {
                     dialogTitle: 'Enviar reporte a...'
                 });
             } catch (shareErr) {
-                console.warn("Error sharing to WhatsApp/Native", shareErr);
-                // We do not block the flow if user cancels the share or there's an error.
+                console.warn("Share to native cancelled or failed", shareErr);
             }
             
-            // Navigate back to VisitDetail
             navigate(-1);
         } catch (error) {
-            console.error("Error al registrar ingreso", error);
-            alert("Error al registrar: " + error.message);
+            console.error("Error al publicar reporte en Github", error);
+            alert("Error de Sincronización: " + error.message);
             setSubmitting(false);
         }
     };

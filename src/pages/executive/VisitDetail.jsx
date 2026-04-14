@@ -50,7 +50,8 @@ const VisitDetail = () => {
             return;
         }
 
-        navigate(`/executive/visit/${id}/form`, { state: { visit } });
+        const fechaInicio = Date.now();
+        navigate(`/executive/visit/${id}/form`, { state: { visit, fechaInicioForm: fechaInicio } });
     };
 
     const handleMarcarSalida = async () => {
