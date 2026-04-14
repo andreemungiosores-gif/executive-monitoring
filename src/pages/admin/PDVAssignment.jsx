@@ -23,17 +23,51 @@ const PDVAssignment = () => {
 
     // --- EFFECTS ---
 
-    // 1. Load Vendors (Users)
+    // 1. Load Vendors (Users) from Github
     useEffect(() => {
-        const usersRef = ref(db, 'users');
-        onValue(usersRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                const vendorList = Object.values(data).map(u => u.username || u.name).filter(Boolean);
-                // Dedup and Sort
-                setVendors([...new Set(vendorList)].sort());
+        const loadVendors = async () => {
+            try {
+                const token = import.meta.env.VITE_GITHUB_TOKEN;
+                const url = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
+                
+                if (!token) return;
+                
+                const res = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
+                if (!res.ok) throw new Error("Error fetching users");
+                
+                const json = await res.json();
+                const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
+                
+                const lines = decodedContent.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                
+                const parsedUsers = lines.slice(1).map(line => {
+                    const values = line.split(',');
+                    return headers.reduce((obj, header, i) => {
+                        obj[header] = values[i] !== undefined ? values[i].trim() : '';
+                        return obj;
+                    }, {});
+                });
+
+                const activeSellers = parsedUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
+                
+                const vendorList = activeSellers.map(u => {
+                    const realName = u.nombre_apellido;
+                    const safeKey = (u.nombre_corto || u.nombre_apellido).trim().replace(/[.#$\[\]]/g, "");
+                    return { id: safeKey, name: realName };
+                });
+
+                // Dedup and sort
+                const dedupedMap = new Map();
+                vendorList.forEach(v => dedupedMap.set(v.id, v));
+                const sortedVendors = Array.from(dedupedMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+                
+                setVendors(sortedVendors);
+            } catch (e) {
+                console.error("Error cargando vendedores desde Github:", e);
             }
-        });
+        };
+        loadVendors();
     }, []);
 
     // 2. Load PDVs (Master Data)
@@ -298,7 +332,7 @@ const PDVAssignment = () => {
                     >
                         <option value="">-- Seleccionar Ejecutivo --</option>
                         {vendors.map(v => (
-                            <option key={v} value={v}>{v}</option>
+                            <option key={v.id} value={v.id}>{v.name}</option>
                         ))}
                     </select>
 
@@ -378,7 +412,7 @@ const PDVAssignment = () => {
                 <div className="w-1/2 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
                     <div className="p-4 border-b border-red-50 bg-red-50/30 flex justify-between items-center">
                         <div>
-                            <h3 className="font-bold text-red-900">Ruta: {selectedVendor || "..."}</h3>
+                            <h3 className="font-bold text-red-900">Ruta: {vendors.find(v => v.id === selectedVendor)?.name || "..."}</h3>
                             <p className="text-xs text-red-400">{selectedDate}</p>
                         </div>
 
