@@ -317,13 +317,16 @@ const AdminMap = () => {
                     }, {});
                 });
 
-                const activeSellers = parsedUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
-                
-                const vendorList = activeSellers.map(u => {
-                    const realName = u.nombre_apellido;
-                    const shortName = u.nombre_corto || u.nombre_apellido; // Fallback to full name
+                const vendorList = parsedUsers.map(u => {
+                    const isActive = u.is_active === 'True' || u.is_active === 'true';
+                    const baseName = u.nombre_apellido;
+                    const baseShort = u.nombre_corto || u.nombre_apellido;
+                    
+                    const realName = isActive ? baseName : `${baseName} (Inactivo)`;
+                    const shortName = isActive ? baseShort : `${baseShort} (I)`;
                     const safeKey = u.id_usuario;
-                    return { id: safeKey, name: realName, shortName: shortName };
+                    
+                    return { id: safeKey, name: realName, shortName: shortName, isActive: isActive };
                 });
 
                 // Dedup based on id
@@ -337,22 +340,32 @@ const AdminMap = () => {
         loadGithubUsers();
     }, []);
 
-    // We build a map of id -> name to merge with active realtime/trail locations
+    // We build a map of id -> name. We only keep users who are either active OR have trails/locations.
     const allUsersMergeMap = new Map();
     const shortNamesMap = new Map();
+    
+    // First, map everyone for lookup
+    const lookupFull = new Map();
+    const lookupShort = new Map();
+    const activeIds = new Set();
+    
     allGithubUsers.forEach(u => {
-        allUsersMergeMap.set(u.id, u.name);
-        shortNamesMap.set(u.id, u.shortName);
+        lookupFull.set(u.id, u.name);
+        lookupShort.set(u.id, u.shortName);
+        if (u.isActive) activeIds.add(u.id);
+    });
+
+    // Determine who should actually be shown on the screen
+    const keysToShow = new Set(activeIds);
+    Object.keys(locations).forEach(k => keysToShow.add(k));
+    Object.keys(trails).forEach(k => keysToShow.add(k));
+
+    keysToShow.forEach(k => {
+        allUsersMergeMap.set(k, lookupFull.get(k) || k);
+        shortNamesMap.set(k, lookupShort.get(k) || k);
     });
     
-    Object.keys(locations).forEach(k => { 
-        if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); 
-        if (!shortNamesMap.has(k)) shortNamesMap.set(k, k); 
-    });
-    Object.keys(trails).forEach(k => { 
-        if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); 
-        if (!shortNamesMap.has(k)) shortNamesMap.set(k, k); 
-    });
+
 
     const allUsers = Array.from(allUsersMergeMap.entries()).map(([id, name]) => ({ id, name })).sort((a,b) => a.name.localeCompare(b.name));
 
