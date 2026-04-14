@@ -196,6 +196,23 @@ const VisitForm = () => {
             // Upload photo to Github
             const photoUrl = await uploadPhotoToGithub(photoData, user.id);
 
+            // Dictionaries for mapping the values to full user-readable text for the CSV and Native Share
+            const estadoMap = {
+                'no_interes': 'No interés en la marca',
+                'interes': 'Interés en la marca',
+                'en_proceso': 'En proceso de seguimiento',
+                'compra_potencial': 'Compra potencial',
+                'venta_concretada': 'Venta concretada'
+            };
+            const recMap = {
+                'efectiva': 'EFECTIVA (Contacto con médico)',
+                'positiva': 'POSITIVA (Avance sin contacto)',
+                'negativa': 'NEGATIVA (Sin contacto relevante)'
+            };
+
+            const fullEstadoStr = estadoMap[estado] || estado;
+            const fullRecStr = recMap[recepcion] || recepcion;
+
             // Construct row payload
             const rowArr = [
                 startStr,
@@ -210,8 +227,8 @@ const VisitForm = () => {
                 user.id || "", // id_usuario
                 photoUrl,
                 comentario,
-                recepcion,
-                estado,
+                fullRecStr,
+                fullEstadoStr,
                 "", // tematica_visita
                 ""  // is_llm_categorized
             ];
@@ -222,20 +239,7 @@ const VisitForm = () => {
             await uploadCSVToGithub(csvRow);
 
             // NATIVE SHARE (WhatsApp Backup)
-            const estadoMap = {
-                'no_interes': 'No interés en la marca',
-                'interes': 'Interés en la marca',
-                'en_proceso': 'En proceso de seguimiento',
-                'compra_potencial': 'Compra potencial',
-                'venta_concretada': 'Venta concretada'
-            };
-            const recMap = {
-                'efectiva': 'EFECTIVA (Contacto con médico)',
-                'positiva': 'POSITIVA (Avance sin contacto)',
-                'negativa': 'NEGATIVA (Sin contacto relevante)'
-            };
-
-            const reportText = `📍 *Visita:* ${pdvName}\n👤 *Ejecutivo:* ${user.name}\n📋 *Estado:* ${estadoMap[estado]}\n🤝 *Recepción:* ${recMap[recepcion]}\n💬 *Comentario:* ${comentario.trim()}`;
+            const reportText = `📍 *Visita:* ${pdvName}\n👤 *Ejecutivo:* ${user.name}\n📋 *Estado:* ${fullEstadoStr}\n🤝 *Recepción:* ${fullRecStr}\n💬 *Comentario:* ${comentario.trim()}`;
 
             try {
                 await Share.share({
