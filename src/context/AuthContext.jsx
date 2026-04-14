@@ -39,7 +39,16 @@ export const AuthProvider = ({ children }) => {
                 if (!res.ok) throw new Error("Error conectando con base de datos de usuarios.");
 
                 const json = await res.json();
-                const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
+                
+                // Decode properly solving unicode issues
+                const binaryStr = window.atob(json.content.replace(/\n/g, ''));
+                const len = binaryStr.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryStr.charCodeAt(i);
+                }
+                const decoder = new TextDecoder('utf-8');
+                const decodedContent = decoder.decode(bytes);
                 
                 const lines = decodedContent.trim().split('\n');
                 const headers = lines[0].split(',').map(h => h.trim());
@@ -51,12 +60,18 @@ export const AuthProvider = ({ children }) => {
                     }, {});
                 });
 
-                // Encontrar al usuario usando la columna nombre_apellido (es sensible a mayúsculas/minúsculas o podemos forzar lower)
-                const foundUser = parsedUsers.find(u => u.nombre_apellido.trim() === username.trim());
+                // Encontrar al usuario permitiendo búsqueda en minúsculas y aceptando nombre completo o corto
+                const targetUser = username.trim().toLowerCase();
+                const foundUser = parsedUsers.find(u => {
+                    const fullName = (u.nombre_apellido || '').trim().toLowerCase();
+                    const shortName = (u.nombre_corto || '').trim().toLowerCase();
+                    const aliasId = (u.id_usuario || '').trim().toLowerCase();
+                    return fullName === targetUser || shortName === targetUser || aliasId === targetUser;
+                });
 
                 if (foundUser) {
                     const validPass = foundUser.pass || "123";
-                    if (validPass === password) {
+                    if (validPass === password.trim()) {
                         if (foundUser.is_active !== 'True' && foundUser.is_active !== 'true') {
                             throw new Error("El usuario está desactivado por un supervisor");
                         }
