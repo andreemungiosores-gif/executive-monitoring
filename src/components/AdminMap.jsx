@@ -282,34 +282,59 @@ const AdminMap = () => {
 
     // --- HELPERS ---
     // Merge users from DB, live locations, and trails to ensure everyone is listed
-    const [allUsersList, setAllUsersList] = useState([]);
+    const [allGithubUsers, setAllGithubUsers] = useState([]);
 
     useEffect(() => {
-        const usersRef = ref(db, 'users');
-        get(usersRef).then((snapshot) => {
-            if (snapshot.exists()) {
-                const usersData = snapshot.val();
-                // Assuming users are stored by UID, key is UID, value contains 'username' or 'name'
-                // Or if keys are usernames directly. Let's assume keys are UIDs and we need the 'username' field, 
-                // BUT looking at previous code, 'locations' keys seem to be usernames directly (e.g. 'Angel', 'Mauro').
-                // So we need to normalize this. 
-
-                // Strategy: Collect all unique usernames found in 'users' node.
-                // If structure is users/{uid}/username:
-                const loadedUsers = [];
-                Object.values(usersData).forEach(u => {
-                    if (u.username) loadedUsers.push(u.username);
+        const loadGithubUsers = async () => {
+            try {
+                const token = import.meta.env.VITE_GITHUB_TOKEN;
+                const url = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
+                if (!token) return;
+                
+                const res = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
+                if (!res.ok) return;
+                
+                const json = await res.json();
+                const decoded = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
+                
+                const lines = decoded.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim());
+                
+                const parsedUsers = lines.slice(1).map(line => {
+                    const values = line.split(',');
+                    return headers.reduce((obj, header, i) => {
+                        obj[header] = values[i] !== undefined ? values[i].trim() : '';
+                        return obj;
+                    }, {});
                 });
-                setAllUsersList(loadedUsers);
+
+                const activeSellers = parsedUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
+                
+                const vendorList = activeSellers.map(u => {
+                    const realName = u.nombre_apellido;
+                    const safeKey = (u.nombre_corto || u.nombre_apellido).trim().replace(/[.#$\[\]]/g, "");
+                    return { id: safeKey, name: realName };
+                });
+
+                // Dedup based on id
+                const dedupedMap = new Map();
+                vendorList.forEach(v => dedupedMap.set(v.id, v));
+                setAllGithubUsers(Array.from(dedupedMap.values()));
+            } catch (e) {
+                console.error("Error loading users:", e);
             }
-        }).catch(err => console.error("Error loading users:", err));
+        };
+        loadGithubUsers();
     }, []);
 
-    const allUsers = Array.from(new Set([
-        ...allUsersList,
-        ...Object.keys(locations),
-        ...Object.keys(trails)
-    ])).sort();
+    // We build a map of id -> name to merge with active realtime/trail locations
+    const allUsersMergeMap = new Map();
+    allGithubUsers.forEach(u => allUsersMergeMap.set(u.id, u.name));
+    
+    Object.keys(locations).forEach(k => { if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); });
+    Object.keys(trails).forEach(k => { if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); });
+
+    const allUsers = Array.from(allUsersMergeMap.entries()).map(([id, name]) => ({ id, name })).sort((a,b) => a.name.localeCompare(b.name));
 
     const defaultCenter = [-12.0464, -77.0428];
     const googleCenter = React.useMemo(() => ({ lat: defaultCenter[0], lng: defaultCenter[1] }), []);
@@ -331,7 +356,9 @@ const AdminMap = () => {
                                 <p>No hay ejecutivos activos.</p>
                             </div>
                         )}
-                        {allUsers.map((username) => {
+                        {allUsers.map((userObj) => {
+                            const username = userObj.id;
+                            const displayName = userObj.name;
                             const isOnline = !!locations[username];
 
                             return (
@@ -342,12 +369,12 @@ const AdminMap = () => {
                                 >
                                     {/* Avatar Placeholder */}
                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}>
-                                        {username.charAt(0).toUpperCase()}
+                                        {displayName.charAt(0).toUpperCase()}
                                     </div>
 
                                     <div className="flex-1">
                                         <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                                            {username}
+                                            {displayName}
                                         </h3>
                                         <div className="flex items-center mt-1">
                                             <span className={`w-2 h-2 rounded-full mr-2 ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
@@ -372,7 +399,9 @@ const AdminMap = () => {
                         <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
                             <div>
                                 <h3 className="font-bold text-lg text-gray-800">Rutas Asignadas</h3>
-                                <p className="text-sm text-gray-500">Ejecutivo: <span className="text-blue-600 font-semibold">{selectedUser}</span></p>
+                                <p className="text-sm text-gray-500">Ejecutivo: <span className="text-blue-600 font-semibold">{
+                                    allUsers.find(u => u.id === selectedUser)?.name || selectedUser
+                                }</span></p>
                             </div>
                             <button
                                 onClick={handleBackToList}
