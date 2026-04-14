@@ -146,9 +146,12 @@ const ExecutiveHome = () => {
 
                         <div className="relative z-10">
                             <h2 className="text-3xl font-bold mb-1">EN JORNADA</h2>
-                            <p className="text-red-100 font-medium mb-6 flex items-center gap-2">
-                                <span className="animate-pulse">●</span> {statusMsg || "Rastreo GPS Activo"}
-                            </p>
+                            {statusMsg && statusMsg !== "Rastreo Activo" && (
+                                <p className="text-red-100 font-medium mb-6 flex items-center gap-2">
+                                    <span className="animate-pulse">●</span> {statusMsg}
+                                </p>
+                            )}
+                            {(!statusMsg || statusMsg === "Rastreo Activo") && <div className="mb-6"></div>}
 
                             <button
                                 onClick={handleCheckOut}
