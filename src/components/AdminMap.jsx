@@ -28,6 +28,12 @@ function getDistance(lat1, lon1, lat2, lon2) {
     return R * c; 
 }
 
+const LEGACY_KEYS = {
+    'Angel': '66100f9d52a1f57bfdcc0aac',
+    'Mauro': '6976935a047835d421e9cd0b'
+};
+const mapLegacyKey = (key) => LEGACY_KEYS[key] || key;
+
 const AdminMap = () => {
     // --- STATE ---
     const [locations, setLocations] = useState({});
@@ -79,6 +85,7 @@ const AdminMap = () => {
                     const hydratedTrails = {};
 
                     Object.entries(historyData).forEach(([username, pushPoints]) => {
+                        const finalKey = mapLegacyKey(username);
                         const points = [];
                         // Sort by timestamp if available to evaluate sequentially
                         const sortedPt = Object.values(pushPoints).sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
@@ -107,7 +114,12 @@ const AdminMap = () => {
                                 }
                             }
                         });
-                        hydratedTrails[username] = points;
+                        
+                        if (hydratedTrails[finalKey]) {
+                            hydratedTrails[finalKey] = [...hydratedTrails[finalKey], ...points];
+                        } else {
+                            hydratedTrails[finalKey] = points;
+                        }
                     });
 
                     console.log("Hydrated Trails:", hydratedTrails);
@@ -136,19 +148,20 @@ const AdminMap = () => {
 
                 if (data) {
                     Object.entries(data).forEach(([key, val]) => {
+                        const finalKey = mapLegacyKey(key);
                         // Filters...
                         if (val.status === 'offline') return;
                         if (val.timestamp && (now - val.timestamp > 10 * 60 * 1000)) return;
 
-                        activeExecs[key] = val;
-                        foundUserKeys.add(key);
+                        activeExecs[finalKey] = val;
+                        foundUserKeys.add(finalKey);
 
                         const lat = val.latitude || val.lat;
                         const lng = val.longitude || val.lng;
 
                         if (lat && lng) {
                             const newPoint = [lat, lng];
-                            const userTrail = nextTrails[key] || [];
+                            const userTrail = nextTrails[finalKey] || [];
                             const lastPoint = userTrail.length > 0 ? userTrail[userTrail.length - 1] : null;
 
                             // Check movement > 5m to avoid noise
@@ -164,7 +177,7 @@ const AdminMap = () => {
                                     const updatedTrail = [...userTrail, newPoint];
                                     // We rely on Firebase History for persistence, but keep RAM buffer reasonable
                                     if (updatedTrail.length > 5000) updatedTrail.shift();
-                                    nextTrails[key] = updatedTrail;
+                                    nextTrails[finalKey] = updatedTrail;
                                 }
                             }
                         }
@@ -312,7 +325,7 @@ const AdminMap = () => {
                 
                 const vendorList = activeSellers.map(u => {
                     const realName = u.nombre_apellido;
-                    const safeKey = (u.nombre_corto || u.nombre_apellido).trim().replace(/[.#$\[\]]/g, "");
+                    const safeKey = u.id_usuario;
                     return { id: safeKey, name: realName };
                 });
 

@@ -53,7 +53,7 @@ const PDVAssignment = () => {
                 
                 const vendorList = activeSellers.map(u => {
                     const realName = u.nombre_apellido;
-                    const safeKey = (u.nombre_corto || u.nombre_apellido).trim().replace(/[.#$\[\]]/g, "");
+                    const safeKey = u.id_usuario;
                     return { id: safeKey, name: realName };
                 });
 

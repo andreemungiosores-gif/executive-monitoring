@@ -61,8 +61,8 @@ export const AuthProvider = ({ children }) => {
                             throw new Error("El usuario está desactivado por un supervisor");
                         }
 
-                        // Utilizamos el nombre_corto sanitizado para Firebase history keys (sin caracteres ilegales)
-                        const safeKey = (foundUser.nombre_corto || foundUser.nombre_apellido).trim().replace(/[.#$\[\]]/g, "");
+                        // Utilizamos el ID base (id_usuario) como llave primaria inmutable para Firebase (historial y locations)
+                        const safeKey = foundUser.id_usuario;
                         
                         const fullUser = { 
                             username: safeKey,
