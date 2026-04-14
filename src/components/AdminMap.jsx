@@ -325,8 +325,9 @@ const AdminMap = () => {
                 
                 const vendorList = activeSellers.map(u => {
                     const realName = u.nombre_apellido;
+                    const shortName = u.nombre_corto || u.nombre_apellido; // Fallback to full name
                     const safeKey = u.id_usuario;
-                    return { id: safeKey, name: realName };
+                    return { id: safeKey, name: realName, shortName: shortName };
                 });
 
                 // Dedup based on id
@@ -342,10 +343,20 @@ const AdminMap = () => {
 
     // We build a map of id -> name to merge with active realtime/trail locations
     const allUsersMergeMap = new Map();
-    allGithubUsers.forEach(u => allUsersMergeMap.set(u.id, u.name));
+    const shortNamesMap = new Map();
+    allGithubUsers.forEach(u => {
+        allUsersMergeMap.set(u.id, u.name);
+        shortNamesMap.set(u.id, u.shortName);
+    });
     
-    Object.keys(locations).forEach(k => { if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); });
-    Object.keys(trails).forEach(k => { if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); });
+    Object.keys(locations).forEach(k => { 
+        if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); 
+        if (!shortNamesMap.has(k)) shortNamesMap.set(k, k); 
+    });
+    Object.keys(trails).forEach(k => { 
+        if (!allUsersMergeMap.has(k)) allUsersMergeMap.set(k, k); 
+        if (!shortNamesMap.has(k)) shortNamesMap.set(k, k); 
+    });
 
     const allUsers = Array.from(allUsersMergeMap.entries()).map(([id, name]) => ({ id, name })).sort((a,b) => a.name.localeCompare(b.name));
 
@@ -413,7 +424,7 @@ const AdminMap = () => {
                             <div>
                                 <h3 className="font-bold text-lg text-gray-800">Rutas Asignadas</h3>
                                 <p className="text-sm text-gray-500">Ejecutivo: <span className="text-blue-600 font-semibold">{
-                                    allUsers.find(u => u.id === selectedUser)?.name || selectedUser
+                                    fullNamesMap.get(selectedUser) || selectedUser
                                 }</span></p>
                             </div>
                             <button
@@ -531,7 +542,7 @@ const AdminMap = () => {
                                     lineJoin: 'round'
                                 }}
                             >
-                                <Popup>Recorrido: {key}</Popup>
+                                <Popup>Recorrido: {shortNamesMap.get(key) || key}</Popup>
                             </Polyline>
                         );
                     })}
