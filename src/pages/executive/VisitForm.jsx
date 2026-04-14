@@ -101,21 +101,23 @@ const VisitForm = () => {
         const token = import.meta.env.VITE_GITHUB_TOKEN;
         const repoUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/visits_reports.csv';
 
+        // 1. Fix crítico: Obtener solo el SHA del archivo maestro para el guardado. 
+        // GitHub API `/contents` oculta el código base64 truncando el archivo si pesa más de 1MB.
         const getRes = await fetch(repoUrl, { headers: { 'Authorization': `token ${token}` } });
-        if (!getRes.ok) throw new Error("Error leyendo visits_reports.csv");
+        if (!getRes.ok) throw new Error("Error obteniendo metadata de visits_reports.csv");
 
         const json = await getRes.json();
         const sha = json.sha;
 
-        const binaryStr = window.atob(json.content.replace(/\n/g, ''));
-        const len = binaryStr.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binaryStr.charCodeAt(i);
-        }
-        const decoder = new TextDecoder('utf-8');
-        const decodedContent = decoder.decode(bytes);
+        // 2. Descargar el historial completo intacto desde Raw User Content (By-pass límites de Megabytes).
+        // Usamos cache busting t=Date.now()
+        const rawUrl = `https://raw.githubusercontent.com/medicaltech-peru/fullstack-template/main/frontend/public/db/visits_reports.csv?t=${Date.now()}`;
+        const rawRes = await fetch(rawUrl, { headers: { 'Authorization': `token ${token}` } });
+        if (!rawRes.ok) throw new Error("Error extrayendo los datos puros RAW de visits_reports.csv");
+        
+        const decodedContent = await rawRes.text();
 
+        // 3. Empalmar filas y reconvertir a UTF-8 base 64 final.
         const newCsv = decodedContent.trim() + '\n' + csvRow;
 
         const encoder = new TextEncoder();
