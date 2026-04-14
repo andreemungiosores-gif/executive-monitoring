@@ -24,31 +24,14 @@ public class MainActivity extends BridgeActivity {
 
         super.onCreate(savedInstanceState);
 
-        // v4.0 & v6.0 HYBRID: Intercept Background Geolocation Broadcasts + Anchor System
+        // v4.0: Intercept Background Geolocation Broadcasts
         LocalBroadcastManager.getInstance(this).registerReceiver(
             new BroadcastReceiver() {
-                private Location baselineAnchor = null;
-
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     try {
                         Location location = intent.getParcelableExtra("location");
                         if (location != null) {
-                            // --- ANCHOR SYSTEM (Anti-Spiderweb) ---
-                            float accuracy = location.getAccuracy();
-                            if (accuracy > 30.0f) { // Indoors or poor signal
-                                if (baselineAnchor == null) {
-                                    baselineAnchor = location; // Set the anchor
-                                } else {
-                                    // Override coords to stay completely stationary, but let timestamp update
-                                    location.setLatitude(baselineAnchor.getLatitude());
-                                    location.setLongitude(baselineAnchor.getLongitude());
-                                }
-                            } else {
-                                // Clear sky, we are walking on the street. Break the anchor.
-                                baselineAnchor = null;
-                            }
-                            
                             postLocationNative(location);
                         }
                     } catch (Exception e) {
