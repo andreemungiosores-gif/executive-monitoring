@@ -424,7 +424,7 @@ const AdminMap = () => {
                             <div>
                                 <h3 className="font-bold text-lg text-gray-800">Rutas Asignadas</h3>
                                 <p className="text-sm text-gray-500">Ejecutivo: <span className="text-blue-600 font-semibold">{
-                                    fullNamesMap.get(selectedUser) || selectedUser
+                                    allUsersMergeMap.get(selectedUser) || selectedUser
                                 }</span></p>
                             </div>
                             <button
