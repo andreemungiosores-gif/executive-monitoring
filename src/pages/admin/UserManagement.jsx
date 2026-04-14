@@ -6,7 +6,6 @@ const parseCSV = (csv) => {
     const lines = csv.trim().split('\n');
     const headers = lines[0].split(',').map(h => h.trim());
     return lines.slice(1).map(line => {
-        // Basic split, assumes no commas inside values
         const values = line.split(',');
         return headers.reduce((obj, header, i) => {
             obj[header] = values[i] !== undefined ? values[i].trim() : '';
@@ -33,10 +32,8 @@ const UserManagement = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newSeller, setNewSeller] = useState({ nombre_corto: '', nombre_apellido: '', pass: '123' });
 
-    const [editingUserId, setEditingUserId] = useState(null);
-    const [editPassValue, setEditPassValue] = useState("");
+    const [editingUser, setEditingUser] = useState(null);
 
-    // Load from GitHub on mount
     useEffect(() => {
         loadUsers();
     }, []);
@@ -58,11 +55,8 @@ const UserManagement = () => {
             const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
             let parsed = parseCSV(decodedContent);
             
-            // Check and add 'pass' column if missing
             parsed = parsed.map(u => {
-                if (typeof u.pass === 'undefined') {
-                    u.pass = "123";
-                }
+                if (typeof u.pass === 'undefined') u.pass = "123";
                 return u;
             });
             
@@ -97,7 +91,7 @@ const UserManagement = () => {
             if (!response.ok) throw new Error("Error al hacer push o el archivo fue modificado externamente.");
 
             const json = await response.json();
-            setFileSha(json.content.sha); // Update hash for future saves
+            setFileSha(json.content.sha); 
             return true;
         } catch (e) {
             console.error(e);
@@ -110,7 +104,6 @@ const UserManagement = () => {
         e.preventDefault();
         if (!newSeller.nombre_corto || !newSeller.nombre_apellido) return;
 
-        // Generate random 24 char hex ID to match standard structure
         const randomId = [...Array(24)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
 
         const newUserObj = {
@@ -133,22 +126,32 @@ const UserManagement = () => {
         if (success) alert("Vendedor creado y sincronizado a GitHub con éxito.");
     };
 
-    const savePasswordEdit = async (userObj) => {
-        const updatedList = allUsers.map(u => {
-            if (u.id_usuario === userObj.id_usuario) {
-                return { ...u, pass: editPassValue };
-            }
-            return u;
-        });
+    const handleUpdateSeller = async (e) => {
+        e.preventDefault();
+        if (!editingUser.nombre_corto || !editingUser.nombre_apellido) return;
 
+        const updatedList = allUsers.map(u => u.id_usuario === editingUser.id_usuario ? editingUser : u);
         setAllUsers(updatedList);
-        setEditingUserId(null);
+        setEditingUser(null);
 
         const csvString = stringifyCSV(updatedList);
-        await saveToGitHub(csvString);
+        const success = await saveToGitHub(csvString);
+        if (success) alert("Vendedor actualizado en Github.");
     };
 
-    // Filter to show only active sellers
+    const handleDeleteSeller = async (id, name) => {
+        if (!window.confirm(`¿Estás sumamente seguro de eliminar PERMANENTEMENTE a ${name} de users.csv de Github?`)) return;
+        
+        // Remove permanently from memory buffer
+        const updatedList = allUsers.filter(u => u.id_usuario !== id);
+        setAllUsers(updatedList);
+        
+        const csvString = stringifyCSV(updatedList);
+        const success = await saveToGitHub(csvString);
+        if (success) alert("Vendedor eliminado correctamente de la base de github.");
+    };
+
+    // Show active sellers conceptually
     const displaySellers = allUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
 
     return (
@@ -187,40 +190,73 @@ const UserManagement = () => {
                             <div className="w-full bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-100">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-500 text-xs font-semibold uppercase">Contraseña</span>
-                                    {editingUserId === user.id_usuario ? (
-                                        <div className="flex items-center gap-2">
-                                            <input 
-                                                autoFocus
-                                                type="text" 
-                                                value={editPassValue} 
-                                                className="w-20 px-2 py-1 text-xs border rounded outline-none"
-                                                onChange={(e) => setEditPassValue(e.target.value)}
-                                            />
-                                            <button onClick={() => savePasswordEdit(user)} className="text-green-600 font-bold hover:text-green-800">✓</button>
-                                            <button onClick={() => setEditingUserId(null)} className="text-red-600 font-bold hover:text-red-800">✕</button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono text-gray-700 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200">
-                                                {user.pass}
-                                            </span>
-                                            <button onClick={() => { setEditingUserId(user.id_usuario); setEditPassValue(user.pass); }} className="text-blue-500 hover:text-blue-700" title="Editar Contraseña">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                            </button>
-                                        </div>
-                                    )}
+                                    <span className="font-mono text-gray-700 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-200">
+                                        {user.pass}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-500 text-xs font-semibold uppercase">Estado</span>
                                     <span className="text-green-600 text-xs font-bold bg-green-100 px-2 py-0.5 rounded-full">Activo</span>
                                 </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-500 text-xs font-semibold uppercase">Nom. Corto</span>
+                                    <span className="text-gray-700 text-xs font-medium truncate ml-2">{user.nombre_corto}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 w-full mt-4">
+                                <button
+                                    onClick={() => setEditingUser({...user})}
+                                    className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    Editar Ficha
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteSeller(user.id_usuario, user.nombre_apellido)}
+                                    className="w-10 flex items-center justify-center bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                                    title="Eliminar permanentemente"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
                             </div>
                         </div>
                     ))}
                 </div>
             )}
 
-            {/* Nuevo Vendedor Modal */}
+            {/* Edit Modal */}
+            {editingUser && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000]">
+                    <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4">Editar Vendedor</h3>
+                        <form onSubmit={handleUpdateSeller} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">ID (No Editable)</label>
+                                <input type="text" value={editingUser.id_usuario} readOnly className="w-full border rounded-lg p-2 bg-gray-100 text-gray-500 cursor-not-allowed outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Corto</label>
+                                <input type="text" value={editingUser.nombre_corto} onChange={e => setEditingUser({...editingUser, nombre_corto: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
+                                <input type="text" value={editingUser.nombre_apellido} onChange={e => setEditingUser({...editingUser, nombre_apellido: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
+                                <input type="text" value={editingUser.pass} onChange={e => setEditingUser({...editingUser, pass: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required />
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                                <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
+                                <button type="submit" className="px-4 py-2 font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Modal */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000]">
                     <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl">
