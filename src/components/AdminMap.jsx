@@ -13,6 +13,24 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+const pdvIconPending = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
+const pdvIconVisited = new L.Icon({
+    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
+
 const TRAIL_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 // Function to calculate distance between two lat/lng coordinates in km
@@ -52,6 +70,7 @@ const AdminMap = () => {
     // --- REFS ---
     const trailsRef = useRef({});
     const mapRef = useRef(null);
+    const pdvMarkerRefs = useRef({});
 
     // --- EFFECTS ---
 
@@ -496,7 +515,16 @@ const AdminMap = () => {
                                 </div>
                             ) : (
                                 processedList.map((task, i) => (
-                                    <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${task.verified ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}>
+                                    <div 
+                                        key={i} 
+                                        className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer hover:bg-gray-100 transition ${task.verified ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}
+                                        onClick={() => {
+                                            const marker = pdvMarkerRefs.current[i];
+                                            if (marker) {
+                                                marker.openPopup();
+                                            }
+                                        }}
+                                    >
                                         <div className="flex-1 min-w-0 mr-2">
                                             <p className={`text-sm font-bold truncate ${task.verified ? 'text-green-800' : 'text-gray-800'}`}>{task.name}</p>
                                             <p className="text-xs text-gray-500 truncate">{task.address || task.distrito || task.speciality}</p>
@@ -628,7 +656,9 @@ const AdminMap = () => {
                         <Marker
                             key={`task-${i}`}
                             position={[task.latitude, task.longitude]}
-                            opacity={task.verified ? 1 : 0.6}
+                            opacity={task.verified ? 1 : 0.9}
+                            icon={task.verified ? pdvIconVisited : pdvIconPending}
+                            ref={(el) => { pdvMarkerRefs.current[i] = el; }}
                         >
                             <Popup>
                                 <strong>{task.name}</strong><br />
