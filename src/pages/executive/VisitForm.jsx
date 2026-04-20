@@ -184,16 +184,7 @@ const VisitForm = () => {
 
             let lat = "";
             let lng = "";
-            try {
-                const position = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
-                lat = position.coords.latitude;
-                lng = position.coords.longitude;
-            } catch(e) {
-                console.warn("GPS falló al capturar coordenadas exactas", e);
-            }
-
-            // Upload photo to Github
-            const photoUrl = await uploadPhotoToGithub(photoData, user.id);
+            // OPTIMIZATION 1: Discarded heavy infinite GPS blocking loop for coords.
 
             // Dictionaries for mapping the values to full user-readable text for the CSV and Native Share
             const estadoMap = {
@@ -211,6 +202,19 @@ const VisitForm = () => {
 
             const fullEstadoStr = estadoMap[estado] || estado;
             const fullRecStr = recMap[recepcion] || recepcion;
+
+            // OPTIMIZATION 3: Trigger Whatsapp natively INSTANTLY because it doesn't need cloud photoUrl
+            const reportText = `📍 *Visita:* ${pdvName}\n👤 *Ejecutivo:* ${user.name}\n📋 *Estado:* ${fullEstadoStr}\n🤝 *Recepción:* ${fullRecStr}\n💬 *Comentario:* ${comentario.trim()}`;
+            
+            const nativeSharePromise = Share.share({
+                title: 'Reporte de Visita',
+                text: reportText,
+                url: photoData.path || photoData.webPath,
+                dialogTitle: 'Enviar reporte a...'
+            }).catch(e => console.warn("Share to native cancelled or failed", e));
+            
+            // OPTIMIZATION 3: While Whatsapp share is open, Network uploads in the background!
+            const photoUrl = await uploadPhotoToGithub(photoData, user.id);
 
             // Construct row payload
             const rowArr = [
@@ -233,23 +237,10 @@ const VisitForm = () => {
             ];
 
             const csvRow = rowArr.map(escapeCSV).join(',');
-
-            // Append row to Github CSV
             await uploadCSVToGithub(csvRow);
 
-            // NATIVE SHARE (WhatsApp Backup)
-            const reportText = `📍 *Visita:* ${pdvName}\n👤 *Ejecutivo:* ${user.name}\n📋 *Estado:* ${fullEstadoStr}\n🤝 *Recepción:* ${fullRecStr}\n💬 *Comentario:* ${comentario.trim()}`;
-
-            try {
-                await Share.share({
-                    title: 'Reporte de Visita',
-                    text: reportText,
-                    url: photoData.path || photoData.webPath,
-                    dialogTitle: 'Enviar reporte a...'
-                });
-            } catch (shareErr) {
-                console.warn("Share to native cancelled or failed", shareErr);
-            }
+            // Await Share wrapper to ensure smooth unmount. 
+            await nativeSharePromise;
             
             navigate(-1);
         } catch (error) {
@@ -263,6 +254,7 @@ const VisitForm = () => {
         try {
             const image = await Camera.getPhoto({
                 quality: 60,
+                width: 1080, // OPTIMIZATION 2: Heavy compression of raw dimension
                 allowEditing: false,
                 resultType: CameraResultType.Uri,
                 source: CameraSource.Camera // Forces camera only, not gallery
