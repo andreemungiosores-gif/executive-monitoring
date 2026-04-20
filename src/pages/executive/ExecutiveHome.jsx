@@ -13,6 +13,9 @@ import { Geolocation } from '@capacitor/geolocation';
 import { ref, update, push } from 'firebase/database';
 import { db } from '../../firebase';
 
+// Global flag to prevent duplicate background watchers on soft navigations
+let isWatcherBooted = false;
+
 const ExecutiveHome = () => {
     const { logout, user } = useAuth();
     const navigate = useNavigate();
@@ -22,12 +25,55 @@ const ExecutiveHome = () => {
     const [watchId, setWatchId] = useState(() => localStorage.getItem('watchId') || null);
     const [statusMsg, setStatusMsg] = useState('');
 
-    // Cleanup on unmount
+    // Resume Tracker on cold start if previously active
     useEffect(() => {
-        return () => {
-            // Optional cleanup
+        const resumeTracking = async () => {
+            if (isTracking && !isWatcherBooted) {
+                console.log("Resuming background tracker on forced reboot");
+                try {
+                    const id = await BackgroundGeolocation.addWatcher(
+                        {
+                            backgroundMessage: "Compartiendo ubicación en tiempo real",
+                            backgroundTitle: "Modo Ejecutivo Activo",
+                            requestPermissions: true,
+                            stale: false,
+                            distanceFilter: 0
+                        },
+                        (location, error) => {
+                            if (error) {
+                                console.error("Watcher Error:", error);
+                                return;
+                            }
+                            if (location) {
+                                console.log("Loc Update Resumed:", location);
+                            }
+                        }
+                    );
+                    setWatchId(id);
+                    localStorage.setItem('watchId', id);
+                    
+                    // Also make sure we alert Firebase that we are back online visually
+                    if (user && user.username) {
+                        update(ref(db, `locations/${user.username}`), {
+                            status: 'online',
+                            active: true,
+                            timestamp: Date.now()
+                        });
+                    }
+                    isWatcherBooted = true;
+                } catch (error) {
+                    console.error("Failed to resume tracking", error);
+                }
+            }
         };
-    }, []);
+
+        resumeTracking();
+        
+        // If we softly navigated here but tracking was already active, we ensure the flag is true
+        if (isTracking) isWatcherBooted = true;
+
+        return () => {};
+    }, [isTracking, user]);
 
     const handleCheckIn = async () => {
         try {
@@ -138,7 +184,8 @@ const ExecutiveHome = () => {
 
     const handleLogout = async () => {
         if (isTracking) {
-            await handleCheckOut(); // Ensure we mark offline BEFORE clearing auth
+            alert("No puedes cerrar sesión mientras estás en jornada.\n\nDebes presionar 'MARCAR SALIDA' primero para finalizar tu día y tu rastro.");
+            return;
         }
         logout();
         navigate('/');
