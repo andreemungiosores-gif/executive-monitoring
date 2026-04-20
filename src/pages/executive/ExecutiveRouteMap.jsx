@@ -3,9 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../../firebase';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+// Controller component to safely programmatically pan the immutable react-leaflet map
+const MapController = ({ centerCmd }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (centerCmd && centerCmd.lat && centerCmd.lng) {
+            map.flyTo([centerCmd.lat, centerCmd.lng], 16, { animate: true, duration: 1.5 });
+        }
+    }, [centerCmd, map]);
+    return null;
+};
 
 // Fix Leaflet icons issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -135,12 +146,25 @@ const ExecutiveRouteMap = () => {
                 <span className="text-sm font-bold text-gray-700">Monitoreo de Ruta</span>
             </div>
 
+            {/* Recenter FAB */}
+            <div className="absolute bottom-8 right-6 z-[1000] flex flex-col gap-4">
+                <button 
+                    onClick={handleManualCenter}
+                    className="bg-white text-blue-600 p-4 rounded-full shadow-lg border border-gray-100 hover:bg-gray-50 flex items-center justify-center transition-transform active:scale-95"
+                >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                </button>
+            </div>
+
             <MapContainer 
                 center={center} 
                 zoom={14} 
-                className="flex-1 w-full"
+                className="flex-1 w-full z-0"
                 zoomControl={false}
             >
+                <MapController centerCmd={centerCmd} />
                 <TileLayer
                     url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
