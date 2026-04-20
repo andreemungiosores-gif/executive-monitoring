@@ -157,14 +157,14 @@ const ExecutiveHome = () => {
             localStorage.removeItem('watchId');
         }
 
-        // WAIT 2.5s for Native Thread to finish any last "Active" POST
-        // This prevents the Java layer from overwriting our "Offline" status
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        // Wipe Identity securely from Native Layer instantly to cut off Java overrides
+        try { await UserSession.setUsername({ username: "" }); } catch(e) {}
 
-        // --- 2. TELL SERVER WE ARE OFFLINE ---
+        // --- 2. TELL SERVER WE ARE OFFLINE IMMEDIATELY ---
         if (user && user.username) {
             try {
-                await update(ref(db, `locations/${user.username}`), {
+                // Fire and forget so we don't trap the user
+                update(ref(db, `locations/${user.username}`), {
                     status: 'offline',
                     active: false,
                     timestamp: Date.now()
@@ -185,9 +185,6 @@ const ExecutiveHome = () => {
                 console.error("Error setting offline/checkout status:", e);
             }
         }
-
-        // Wipe Identity securely from Native Layer
-        try { await UserSession.setUsername({ username: "" }); } catch(e) {}
 
         setIsTracking(false);
         localStorage.setItem('isTracking', 'false');

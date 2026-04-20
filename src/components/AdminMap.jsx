@@ -393,9 +393,27 @@ const AdminMap = () => {
     });
 
     // Determine who should actually be shown on the screen
-    const keysToShow = new Set(activeIds);
-    Object.keys(locations).forEach(k => keysToShow.add(k));
-    Object.keys(trails).forEach(k => keysToShow.add(k));
+    const keysToShow = new Set();
+    
+    // Compute current date locally for Live UI conditions
+    const offsetCalc = new Date().getTimezoneOffset() * 60000;
+    const isTodaySync = selectedDate === new Date(Date.now() - offsetCalc).toISOString().split('T')[0];
+
+    // Only registered users who are currently tracking their locations should appear
+    Object.keys(locations).forEach(k => {
+        if (lookupFull.has(k)) keysToShow.add(k);
+    });
+
+    // If viewing history (not today), or if you want to keep them on screen to click them
+    Object.keys(trails).forEach(k => {
+        if (lookupFull.has(k)) {
+            // ONLY append trails to the list of displayed executives if we are viewing past history.
+            // If it's today's live mode, ONLY active/online execs will remain in the panel!
+            if (!isTodaySync) {
+                keysToShow.add(k);
+            }
+        }
+    });
 
     keysToShow.forEach(k => {
         allUsersMergeMap.set(k, lookupFull.get(k) || k);
