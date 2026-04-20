@@ -47,6 +47,7 @@ const AdminMap = () => {
     const [selectedUser, setSelectedUser] = useState(null);
     const [pdvs, setPdvs] = useState({});
     const [assignments, setAssignments] = useState([]);
+    const [checkins, setCheckins] = useState({});
     
     // --- REFS ---
     const trailsRef = useRef({});
@@ -215,6 +216,23 @@ const AdminMap = () => {
 
         return () => unsubscribe();
     }, [selectedUser, selectedDate]);
+
+    // 2.5 Fetch Checkins for Selected Date
+    useEffect(() => {
+        const loadCheckins = async () => {
+            try {
+                const snapshot = await get(child(ref(db), `checkins/${selectedDate}`));
+                if (snapshot.exists()) {
+                    setCheckins(snapshot.val());
+                } else {
+                    setCheckins({});
+                }
+            } catch (e) {
+                console.error("Error loading checkins:", e);
+            }
+        };
+        loadCheckins();
+    }, [selectedDate]);
 
 
     // 3. Auto-center map when user selected (ONCE only)
@@ -574,6 +592,35 @@ const AdminMap = () => {
                             );
                         }
                         return null;
+                    })}
+
+                    {/* Render Markers - Check-ins/Check-outs (Black Markers) */}
+                    {Object.entries(checkins).map(([key, userCheckins]) => {
+                        const finalKey = mapLegacyKey(key);
+                        if (selectedUser && selectedUser !== finalKey) return null;
+
+                        return Object.entries(userCheckins).map(([checkinId, chk]) => {
+                            if (!chk.latitude || !chk.longitude) return null;
+
+                            const blackIcon = new L.Icon({
+                                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-black.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            });
+
+                            return (
+                                <Marker key={checkinId} position={[chk.latitude, chk.longitude]} icon={blackIcon}>
+                                    <Popup>
+                                        <strong className="uppercase">{chk.type === 'entrada' ? 'Marcar Entrada' : 'Marcar Salida'}</strong><br />
+                                        Ejecutivo: <span className="font-semibold">{shortNamesMap.get(finalKey) || finalKey}</span><br />
+                                        Hora: <strong>{new Date(chk.timestamp).toLocaleTimeString()}</strong>
+                                    </Popup>
+                                </Marker>
+                            );
+                        });
                     })}
 
                     {/* Render Markers - Assigned PDVs */}

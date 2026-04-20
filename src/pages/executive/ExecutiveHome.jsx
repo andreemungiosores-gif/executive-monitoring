@@ -8,8 +8,9 @@ import { App } from '@capacitor/app';
 // Capacitor Plugins
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
 const BatteryOptimization = registerPlugin('BatteryOptimization'); // Add this
+import { Geolocation } from '@capacitor/geolocation';
 
-import { ref, update } from 'firebase/database';
+import { ref, update, push } from 'firebase/database';
 import { db } from '../../firebase';
 
 const ExecutiveHome = () => {
@@ -69,6 +70,25 @@ const ExecutiveHome = () => {
             localStorage.setItem('isTracking', 'true');
             setStatusMsg("Rastreo Activo");
 
+            // --- 2. RECORD CHECK-IN MARKER ---
+            if (user && user.username) {
+                try {
+                    const coords = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                    // Use Peru Time (UTC-5)
+                    const offset = 5 * 60 * 60 * 1000;
+                    const dateStr = new Date(Date.now() - offset).toISOString().split('T')[0];
+                    
+                    await push(ref(db, `checkins/${dateStr}/${user.username}`), {
+                        type: 'entrada',
+                        latitude: coords.coords.latitude,
+                        longitude: coords.coords.longitude,
+                        timestamp: Date.now()
+                    });
+                } catch(e) {
+                    console.error("Error saving checkin marker:", e);
+                }
+            }
+
         } catch (error) {
             alert("Error al iniciar rastreo: " + error.message);
             setStatusMsg("Error");
@@ -94,8 +114,20 @@ const ExecutiveHome = () => {
                     active: false,
                     timestamp: Date.now()
                 });
+                
+                // --- 3. RECORD CHECK-OUT MARKER ---
+                const coords = await Geolocation.getCurrentPosition({ enableHighAccuracy: true });
+                const offset = 5 * 60 * 60 * 1000;
+                const dateStr = new Date(Date.now() - offset).toISOString().split('T')[0];
+                
+                await push(ref(db, `checkins/${dateStr}/${user.username}`), {
+                    type: 'salida',
+                    latitude: coords.coords.latitude,
+                    longitude: coords.coords.longitude,
+                    timestamp: Date.now()
+                });
             } catch (e) {
-                console.error("Error setting offline status:", e);
+                console.error("Error setting offline/checkout status:", e);
             }
         }
 
