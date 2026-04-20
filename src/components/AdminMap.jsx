@@ -278,7 +278,7 @@ const AdminMap = () => {
             // Use existing 'verified' status if we persist it, or calculate purely on trails
             // For now, let's assume 'verified' might be stored, or we calculate it.
             // If status is 'visited', we trust it.
-            if (task.status === 'visited') return { ...task, verified: true };
+            if (task.status === 'visited' || task.status === 'completed') return { ...task, verified: true };
 
             // Proximity Check (Naive: if any trail point is within ~50m)
             // 0.0005 degrees is roughly 55 meters at equator
