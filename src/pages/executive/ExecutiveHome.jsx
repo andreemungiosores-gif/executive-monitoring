@@ -4,14 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import VisitList from './VisitList';
 import { registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { Geolocation } from '@capacitor/geolocation';
+import { ref, update, push } from 'firebase/database';
+import { db } from '../../firebase';
 
 // Capacitor Plugins
 const BackgroundGeolocation = registerPlugin('BackgroundGeolocation');
-const BatteryOptimization = registerPlugin('BatteryOptimization'); // Add this
-import { Geolocation } from '@capacitor/geolocation';
-
-import { ref, update, push } from 'firebase/database';
-import { db } from '../../firebase';
+const BatteryOptimization = registerPlugin('BatteryOptimization');
+const UserSession = registerPlugin('UserSession');
 
 // Global flag to prevent duplicate background watchers on soft navigations
 let isWatcherBooted = false;
@@ -31,6 +31,11 @@ const ExecutiveHome = () => {
             if (isTracking && !isWatcherBooted) {
                 console.log("Resuming background tracker on forced reboot");
                 try {
+                    // Inject Identity string into the Native Layer before firing up tracker 
+                    if (user && user.username) {
+                        try { await UserSession.setUsername({ username: user.username }); } catch(e) { console.warn(e); }
+                    }
+                    
                     const id = await BackgroundGeolocation.addWatcher(
                         {
                             backgroundMessage: "Compartiendo ubicación en tiempo real",
@@ -76,8 +81,12 @@ const ExecutiveHome = () => {
     }, [isTracking, user]);
 
     const handleCheckIn = async () => {
+        if (!user) return;
+        setStatusMsg("Iniciando...");
+
         try {
-            setStatusMsg("Iniciando GPS...");
+            // Give identity to Native Layer HTTP Interceptor
+            try { await UserSession.setUsername({ username: user.username }); } catch(e) { console.warn(e); }
 
             // 0. Request Battery Optimization Exemptions (CRITICAL)
             try {
@@ -177,9 +186,12 @@ const ExecutiveHome = () => {
             }
         }
 
+        // Wipe Identity securely from Native Layer
+        try { await UserSession.setUsername({ username: "" }); } catch(e) {}
+
         setIsTracking(false);
-        localStorage.removeItem('isTracking');
-        setStatusMsg("Jornada Finalizada");
+        localStorage.setItem('isTracking', 'false');
+        setStatusMsg("Seguimiento Detenido");
     };
 
     const handleLogout = async () => {
