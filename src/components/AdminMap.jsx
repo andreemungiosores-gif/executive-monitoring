@@ -404,15 +404,9 @@ const AdminMap = () => {
         if (lookupFull.has(k)) keysToShow.add(k);
     });
 
-    // If viewing history (not today), or if you want to keep them on screen to click them
+    // Also show registered users who have trails (even if offline now) so they appear as "Desconectado"
     Object.keys(trails).forEach(k => {
-        if (lookupFull.has(k)) {
-            // ONLY append trails to the list of displayed executives if we are viewing past history.
-            // If it's today's live mode, ONLY active/online execs will remain in the panel!
-            if (!isTodaySync) {
-                keysToShow.add(k);
-            }
-        }
+        if (lookupFull.has(k)) keysToShow.add(k);
     });
 
     keysToShow.forEach(k => {
