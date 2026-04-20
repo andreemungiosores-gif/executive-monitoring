@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Share } from '@capacitor/share';
 import { ref, update, onValue } from 'firebase/database';
 import { db } from '../../firebase';
 
@@ -66,6 +68,36 @@ const VisitDetail = () => {
             } catch (e) {
                 console.error("Error tracking checkInTime instantly:", e);
             }
+        }
+
+        // --- NATIVE CAMERA & SHARE CHECK-IN ---
+        try {
+            const image = await Camera.getPhoto({
+                quality: 80,
+                allowEditing: false,
+                resultType: CameraResultType.Uri,
+                source: CameraSource.Camera // Strict to Live Camera only
+            });
+
+            const currentObjDate = new Date(fechaInicio);
+            const timeStr = currentObjDate.toLocaleTimeString();
+            const executiveName = user.nombre_apellido || user.name || user.username;
+            
+            const shareText = `*INGRESO A PDV*\n*Ejecutivo:* ${executiveName}\n*PDV:* ${pdvName}\n*Dirección:* ${pdvAddress}\n*Hora:* ${timeStr}`;
+
+            await Share.share({
+                title: 'Ingreso a PDV',
+                text: shareText,
+                url: image.path,
+                dialogTitle: 'Compartir Ingreso'
+            });
+
+            // Prevent React Router from glitching due to Share sheet popping down immediately
+            await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+            console.log("Cámara cancelada o falló el compartir:", error);
+            alert("⚠️ Debes tomar y compartir tu foto de ingreso para proceder con la visita.");
+            return; // ABORT NAVIGATION
         }
 
         navigate(`/executive/visit/${id}/form`, { state: { visit, fechaInicioForm: fechaInicio } });
