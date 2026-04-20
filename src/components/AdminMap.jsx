@@ -635,6 +635,12 @@ const AdminMap = () => {
                                 <span className={task.verified ? "text-green-600 font-bold" : "text-orange-500 font-bold"}>
                                     {task.verified ? "✅ VISITADO" : "⏳ PENDIENTE"}
                                 </span>
+                                {(task.checkInTime || task.checkOutTime) && (
+                                    <div className="mt-2 pt-2 border-t border-gray-200 text-xs text-gray-700">
+                                        {task.checkInTime && <div className="mb-1"><strong>Ingreso:</strong> {new Date(task.checkInTime).toLocaleTimeString()}</div>}
+                                        {task.checkOutTime && <div><strong>Salida:</strong> {new Date(task.checkOutTime).toLocaleTimeString()}</div>}
+                                    </div>
+                                )}
                             </Popup>
                         </Marker>
                     ))}
