@@ -83,7 +83,7 @@ const VisitDetail = () => {
             const timeStr = currentObjDate.toLocaleTimeString();
             const executiveName = user.nombre_apellido || user.name || user.username;
             
-            const shareText = `*INGRESO A PDV*\n*Ejecutivo:* ${executiveName}\n*PDV:* ${pdvName}\n*Dirección:* ${pdvAddress}\n*Hora:* ${timeStr}`;
+            const shareText = `*INGRESO A PDV*\n👤 *Ejecutivo:* ${executiveName}\n📍 *PDV:* ${pdvName}\n🗺️ *Dirección:* ${pdvAddress}\n⏰ *Hora:* ${timeStr}`;
 
             await Share.share({
                 title: 'Ingreso a PDV',
