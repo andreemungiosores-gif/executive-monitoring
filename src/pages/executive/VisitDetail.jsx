@@ -97,6 +97,22 @@ const VisitDetail = () => {
         } catch (error) {
             console.log("Cámara cancelada o falló el compartir:", error);
             alert("⚠️ Debes tomar y compartir tu foto de ingreso para proceder con la visita.");
+            
+            // ROLLBACK ESTADO Y CHECK-IN
+            if (user && user.username && id) {
+                try {
+                    const d = new Date();
+                    const offset = d.getTimezoneOffset() * 60000;
+                    const todayStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
+                    
+                    await update(ref(db, `assignments/${todayStr}/${user.username}/${id}`), {
+                        status: 'pending',
+                        checkInTime: null
+                    });
+                } catch (e) {
+                    console.error("Error al revertir estado:", e);
+                }
+            }
             return; // ABORT NAVIGATION
         }
 
