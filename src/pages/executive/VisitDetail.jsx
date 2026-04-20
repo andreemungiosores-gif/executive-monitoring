@@ -43,7 +43,7 @@ const VisitDetail = () => {
         return () => unsub();
     }, [user, id]);
 
-    const handleMarcarIngreso = () => {
+    const handleMarcarIngreso = async () => {
         const isTracking = localStorage.getItem('isTracking') === 'true';
         if (!isTracking) {
             alert("⚠️ Acceso denegado.\n\nPara poder registrar la visita al PDV (" + pdvName + "), primero debes ir al menú principal y presionar el botón 'MARCAR ENTRADA' para iniciar el rastreo de tu jornada.");
@@ -51,6 +51,23 @@ const VisitDetail = () => {
         }
 
         const fechaInicio = Date.now();
+
+        // Write to Firebase immediately so AdminMap updates instantly
+        if (user && user.username && id) {
+            try {
+                const d = new Date();
+                const offset = d.getTimezoneOffset() * 60000;
+                const todayStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
+                
+                await update(ref(db, `assignments/${todayStr}/${user.username}/${id}`), {
+                    status: 'in_progress',
+                    checkInTime: fechaInicio
+                });
+            } catch (e) {
+                console.error("Error tracking checkInTime instantly:", e);
+            }
+        }
+
         navigate(`/executive/visit/${id}/form`, { state: { visit, fechaInicioForm: fechaInicio } });
     };
 

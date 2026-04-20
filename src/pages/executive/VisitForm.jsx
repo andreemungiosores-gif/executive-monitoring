@@ -172,8 +172,7 @@ const VisitForm = () => {
         try {
             // Update firebase real-time UI tracking locally
             await update(ref(db, `assignments/${todayStr}/${user.username}/${id}`), {
-                status: 'in_progress',
-                checkInTime: Date.now()
+                status: 'in_progress'
             });
 
             // GITHUB REPORT COMPOSITION:
