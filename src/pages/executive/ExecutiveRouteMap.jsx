@@ -80,6 +80,26 @@ const ExecutiveRouteMap = () => {
     const [visits, setVisits] = useState([]);
     const [myLocation, setMyLocation] = useState(null);
 
+    // Centering states
+    const [centerCmd, setCenterCmd] = useState(null);
+    const [hasInitialCentered, setHasInitialCentered] = useState(false);
+
+    // Auto Center immediately when GPS lock is first acquired
+    useEffect(() => {
+        if (myLocation && !hasInitialCentered) {
+            setCenterCmd({ lat: myLocation[0], lng: myLocation[1], timestamp: Date.now() });
+            setHasInitialCentered(true);
+        }
+    }, [myLocation, hasInitialCentered]);
+
+    const handleManualCenter = () => {
+        if (myLocation) {
+            setCenterCmd({ lat: myLocation[0], lng: myLocation[1], timestamp: Date.now() });
+        } else {
+            alert("Aún estamos obteniendo tu ubicación satelital... Intenta de nuevo en unos segundos.");
+        }
+    };
+
     useEffect(() => {
         if (!user || !user.username) return;
 
