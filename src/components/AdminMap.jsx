@@ -291,22 +291,10 @@ const AdminMap = () => {
     // Calculate Visits based on Proximity (Verification)
     // Returns the assignments list but with 'verified_visit' boolean
     const getProcessedAssignments = () => {
-        const userTrail = trails[selectedUser] || [];
-
         return assignments.map(task => {
-            // Use existing 'verified' status if we persist it, or calculate purely on trails
-            // For now, let's assume 'verified' might be stored, or we calculate it.
-            // If status is 'visited', we trust it.
-            if (task.status === 'visited' || task.status === 'completed') return { ...task, verified: true };
-
-            // Proximity Check (Naive: if any trail point is within ~50m)
-            // 0.0005 degrees is roughly 55 meters at equator
-            if (userTrail.length > 0) {
-                const isVisited = userTrail.some(point => {
-                    const dist = Math.sqrt(Math.pow(point[0] - task.latitude, 2) + Math.pow(point[1] - task.longitude, 2));
-                    return dist < 0.0005;
-                });
-                if (isVisited) return { ...task, verified: true };
+            // Evaluamos la visita estrictamente por la accion del vendedor (Marcar Entrada = in_progress)
+            if (task.status === 'visited' || task.status === 'completed' || task.status === 'in_progress') {
+                return { ...task, verified: true };
             }
 
             return { ...task, verified: false };
