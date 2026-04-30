@@ -155,16 +155,16 @@ const UserManagement = () => {
     const displaySellers = allUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Gestión de Vendedores (Sincronizado)</h2>
-                    <p className="text-gray-500">Conectado en vivo con GitHub: `users.csv`</p>
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-800">Gestión de Vendedores (Sincronizado)</h2>
+                    <p className="text-sm md:text-base text-gray-500">Conectado en vivo con GitHub: `users.csv`</p>
                 </div>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
                     disabled={isLoading}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-red-200 transition-all flex items-center gap-2"
+                    className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-red-200 transition-all flex items-center justify-center gap-2"
                 >
                     {isLoading ? "Cargando..." : "+ Nuevo Vendedor"}
                 </button>
@@ -227,8 +227,8 @@ const UserManagement = () => {
 
             {/* Edit Modal */}
             {editingUser && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000]">
-                    <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000] p-4">
+                    <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold mb-4">Editar Vendedor</h3>
                         <form onSubmit={handleUpdateSeller} className="space-y-4">
                             <div>
@@ -247,9 +247,9 @@ const UserManagement = () => {
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Contraseña</label>
                                 <input type="text" value={editingUser.pass} onChange={e => setEditingUser({...editingUser, pass: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500" required />
                             </div>
-                            <div className="flex justify-end gap-2 mt-4">
-                                <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
-                                <button type="submit" className="px-4 py-2 font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar Cambios</button>
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-6">
+                                <button type="button" onClick={() => setEditingUser(null)} className="w-full sm:w-auto px-4 py-2 font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
+                                <button type="submit" className="w-full sm:w-auto px-4 py-2 font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar Cambios</button>
                             </div>
                         </form>
                     </div>
@@ -258,8 +258,8 @@ const UserManagement = () => {
 
             {/* Add Modal */}
             {isAddModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000]">
-                    <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000] p-4">
+                    <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold mb-4">Crear Vendedor</h3>
                         <p className="text-sm text-gray-500 mb-4">Se creará con un ID único y la contraseña "123" por defecto directamente en Github.</p>
                         <form onSubmit={handleCreateSeller} className="space-y-4">
@@ -271,9 +271,9 @@ const UserManagement = () => {
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
                                 <input type="text" value={newSeller.nombre_apellido} onChange={e => setNewSeller({...newSeller, nombre_apellido: e.target.value})} className="w-full border rounded-lg p-2 outline-none focus:ring-2 focus:ring-red-500" required />
                             </div>
-                            <div className="flex justify-end gap-2 mt-4">
-                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2 font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
-                                <button type="submit" className="px-4 py-2 font-bold bg-red-600 text-white rounded-lg hover:bg-red-700">Autorizar y Crear</button>
+                            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-6">
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="w-full sm:w-auto px-4 py-2 font-bold text-gray-500 hover:text-gray-700">Cancelar</button>
+                                <button type="submit" className="w-full sm:w-auto px-4 py-2 font-bold bg-red-600 text-white rounded-lg hover:bg-red-700">Autorizar y Crear</button>
                             </div>
                         </form>
                     </div>

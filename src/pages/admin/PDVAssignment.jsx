@@ -306,29 +306,29 @@ const PDVAssignment = () => {
 
 
     return (
-        <div className="p-6 h-full flex flex-col">
+        <div className="p-4 md:p-6 h-full flex flex-col overflow-auto md:overflow-hidden">
 
             {/* HERADER */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 flex-shrink-0">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-800">Asignación de Rutas</h2>
-                    <p className="text-gray-500">Administra los puntos de venta para cada ejecutivo</p>
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-800">Asignación de Rutas</h2>
+                    <p className="text-sm md:text-base text-gray-500">Administra los puntos de venta para cada ejecutivo</p>
                 </div>
 
-                <div className="flex gap-2 items-center bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center bg-white p-2 rounded-xl shadow-sm border border-gray-100 w-full md:w-auto">
                     {/* Date Picker */}
                     <input
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-red-500"
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-red-500 w-full sm:w-auto flex-1 sm:flex-none"
                     />
 
                     {/* Vendor Select */}
                     <select
                         value={selectedVendor}
                         onChange={(e) => setSelectedVendor(e.target.value)}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-red-500 min-w-[200px]"
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-red-500 min-w-0 sm:min-w-[200px] flex-1 w-full sm:w-auto"
                     >
                         <option value="">-- Seleccionar Ejecutivo --</option>
                         {vendors.map(v => (
@@ -340,7 +340,7 @@ const PDVAssignment = () => {
                     <button
                         onClick={syncPdvsFromGitHub}
                         disabled={importing}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
                         title="Sincronizar Data Maestra (GitHub)"
                     >
                         <svg className={`w-6 h-6 ${importing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -350,14 +350,14 @@ const PDVAssignment = () => {
 
 
             {/* MAIN SPLIT VIEW */}
-            <div className="flex-1 flex gap-6 overflow-hidden">
+            <div className="flex-1 flex flex-col lg:flex-row gap-6 lg:overflow-hidden min-h-0">
 
                 {/* LEFT: AVAILABLE PDVS */}
-                <div className="w-1/2 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col lg:overflow-hidden min-h-[400px] lg:min-h-0">
+                    <div className="p-4 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-gray-50/50 gap-3">
                         <h3 className="font-bold text-gray-700">Puntos Disponibles</h3>
 
-                        <div className="relative w-64">
+                        <div className="relative w-full sm:w-64">
                             <input
                                 type="text"
                                 placeholder="Buscar clínica..."
@@ -379,20 +379,20 @@ const PDVAssignment = () => {
                                 const isAssigned = assignedPdvs.some(p => p.id === pdv.id);
                                 return (
                                     <div key={pdv.id} className="group p-3 hover:bg-gray-50 rounded-xl border border-transparent hover:border-gray-100 transition-all flex justify-between items-center">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 flex-shrink-0">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                             </div>
-                                            <div>
-                                                <h4 className="font-bold text-gray-800 text-sm">{pdv.name}</h4>
-                                                <p className="text-xs text-gray-500">{pdv.address || pdv.district}</p>
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-gray-800 text-sm truncate">{pdv.name}</h4>
+                                                <p className="text-xs text-gray-500 truncate">{pdv.address || pdv.district}</p>
                                             </div>
                                         </div>
 
                                         <button
                                             onClick={() => !isAssigned && handleAssign(pdv)}
                                             disabled={isAssigned || !selectedVendor}
-                                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isAssigned ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 group-hover:bg-blue-100 group-hover:text-blue-600'}`}
+                                            className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center transition-colors ${isAssigned ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 group-hover:bg-blue-100 group-hover:text-blue-600'}`}
                                         >
                                             {isAssigned ? (
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -409,51 +409,54 @@ const PDVAssignment = () => {
 
 
                 {/* RIGHT: ASSIGNED LIST */}
-                <div className="w-1/2 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden relative">
-                    <div className="p-4 border-b border-red-50 bg-red-50/30 flex justify-between items-center">
+                <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col lg:overflow-hidden min-h-[400px] lg:min-h-0 relative">
+                    <div className="p-4 border-b border-red-50 bg-red-50/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div>
-                            <h3 className="font-bold text-red-900">Ruta: {vendors.find(v => v.id === selectedVendor)?.name || "..."}</h3>
+                            <h3 className="font-bold text-red-900 truncate max-w-[200px] sm:max-w-[300px]">Ruta: {vendors.find(v => v.id === selectedVendor)?.name || "..."}</h3>
                             <p className="text-xs text-red-400">{selectedDate}</p>
                         </div>
 
-                        {saveStatus === 'saved' && <span className="text-green-600 font-bold text-sm animate-pulse">¡Guardado!</span>}
-                        {saveStatus === 'unsaved' && <span className="text-orange-500 font-bold text-xs">Cambios sin guardar*</span>}
-
-                        <button
-                            onClick={handleSave}
-                            disabled={!selectedVendor || saveStatus === 'saving'}
-                            className={`px-4 py-2 rounded-lg font-bold text-white text-sm shadow-md transition-all ${saveStatus === 'saved' ? 'bg-green-500' : 'bg-red-600 hover:bg-red-700'}`}
-                        >
-                            {saveStatus === 'saving' ? 'Guardando...' : 'Guardar Cambios'}
-                        </button>
+                        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                            <div className="flex flex-col items-end">
+                                {saveStatus === 'saved' && <span className="text-green-600 font-bold text-sm animate-pulse">¡Guardado!</span>}
+                                {saveStatus === 'unsaved' && <span className="text-orange-500 font-bold text-xs">Cambios sin guardar*</span>}
+                            </div>
+                            <button
+                                onClick={handleSave}
+                                disabled={!selectedVendor || saveStatus === 'saving'}
+                                className={`px-4 py-2 rounded-lg font-bold text-white text-sm shadow-md transition-all whitespace-nowrap flex-shrink-0 ${saveStatus === 'saved' ? 'bg-green-500' : 'bg-red-600 hover:bg-red-700'}`}
+                            >
+                                {saveStatus === 'saving' ? 'Guardando...' : 'Guardar Cambios'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/30 custom-scrollbar relative">
                         {!selectedVendor ? (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                            <div className="absolute inset-0 flex items-center justify-center text-gray-400 p-4 text-center">
                                 <p className="font-medium">Selecciona un ejecutivo para comenzar</p>
                             </div>
                         ) : assignedPdvs.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-300">
-                                <svg className="w-16 h-16 mb-2 opacity-20" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
+                            <div className="flex flex-col items-center justify-center h-full text-gray-400 p-4 text-center">
+                                <svg className="w-16 h-16 mb-2 opacity-30" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" /></svg>
                                 <p>No hay puntos asignados para esta fecha</p>
                             </div>
                         ) : (
                             assignedPdvs.map(pdv => (
                                 <div key={pdv.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center group animate-fadeIn">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 flex-shrink-0 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold">
                                             {pdv.speciality ? pdv.speciality.charAt(0) : 'P'}
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-gray-800 text-sm">{pdv.name}</h4>
-                                            <p className="text-xs text-gray-500">{pdv.district}</p>
+                                        <div className="min-w-0">
+                                            <h4 className="font-bold text-gray-800 text-sm truncate">{pdv.name}</h4>
+                                            <p className="text-xs text-gray-500 truncate">{pdv.district}</p>
                                         </div>
                                     </div>
 
                                     <button
                                         onClick={() => handleRemove(pdv.id)}
-                                        className="text-gray-300 hover:text-red-500 transition-colors p-2"
+                                        className="text-gray-400 hover:text-red-500 transition-colors p-2 flex-shrink-0"
                                         title="Remover de la ruta"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>

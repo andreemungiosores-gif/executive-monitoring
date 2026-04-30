@@ -422,20 +422,20 @@ const AdminMap = () => {
     const googleCenter = React.useMemo(() => ({ lat: defaultCenter[0], lng: defaultCenter[1] }), []);
 
     return (
-        <div className="flex h-full w-full bg-gray-50">
+        <div className="flex flex-col md:flex-row h-full w-full bg-gray-50">
             {/* LEFT PANEL: Executive List / Details */}
-            <div className="w-1/3 h-full p-4 flex flex-col z-10 shadow-xl bg-white border-r relative">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6">Ejecutivos</h2>
+            <div className="w-full md:w-1/3 h-[45%] md:h-full p-4 flex flex-col z-10 shadow-xl bg-white border-b md:border-b-0 md:border-r relative order-2 md:order-1">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-6 flex-shrink-0">Ejecutivos</h2>
 
                 {!selectedUser ? (
                     /* LIST VIEW */
                     <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                         {allUsers.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 md:h-16 md:w-16 mb-2 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                 </svg>
-                                <p>No hay ejecutivos activos.</p>
+                                <p className="text-sm md:text-base">No hay ejecutivos activos.</p>
                             </div>
                         )}
                         {allUsers.map((userObj) => {
@@ -447,26 +447,26 @@ const AdminMap = () => {
                                 <div
                                     key={username}
                                     onClick={() => setSelectedUser(username)}
-                                    className="flex items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all hover:bg-gray-50 group"
+                                    className="flex items-center p-3 md:p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all hover:bg-gray-50 group"
                                 >
                                     {/* Avatar Placeholder */}
-                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}>
+                                    <div className={`w-10 h-10 md:w-12 md:h-12 flex-shrink-0 rounded-full flex items-center justify-center text-white font-bold text-lg mr-3 md:mr-4 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`}>
                                         {displayName.charAt(0).toUpperCase()}
                                     </div>
 
-                                    <div className="flex-1">
-                                        <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-gray-800 group-hover:text-blue-600 transition-colors truncate text-sm md:text-base">
                                             {displayName}
                                         </h3>
                                         <div className="flex items-center mt-1">
-                                            <span className={`w-2 h-2 rounded-full mr-2 ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                                            <span className="text-xs text-gray-500 font-medium">
+                                            <span className={`w-2 h-2 rounded-full mr-2 flex-shrink-0 ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                                            <span className="text-xs text-gray-500 font-medium truncate">
                                                 {isOnline ? 'En línea' : 'Desconectado'}
                                             </span>
                                         </div>
                                     </div>
 
-                                    <div className="text-gray-300 group-hover:text-gray-600">
+                                    <div className="text-gray-300 group-hover:text-gray-600 flex-shrink-0 ml-2">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                             <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                                         </svg>
@@ -477,59 +477,59 @@ const AdminMap = () => {
                     </div>
                 ) : (
                     /* DETAILS VIEW (Mock for now) */
-                    <div className="flex-1 flex flex-col animate-fadeIn">
-                        <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-4">
-                            <div>
-                                <h3 className="font-bold text-lg text-gray-800">Rutas Asignadas</h3>
-                                <p className="text-sm text-gray-500">Ejecutivo: <span className="text-blue-600 font-semibold">{
+                    <div className="flex-1 flex flex-col min-h-0 animate-fadeIn">
+                        <div className="flex items-center justify-between mb-3 md:mb-4 border-b border-gray-100 pb-3 flex-shrink-0">
+                            <div className="min-w-0 mr-2">
+                                <h3 className="font-bold text-base md:text-lg text-gray-800 truncate">Rutas Asignadas</h3>
+                                <p className="text-xs md:text-sm text-gray-500 truncate">Ejecutivo: <span className="text-blue-600 font-semibold">{
                                     allUsersMergeMap.get(selectedUser) || selectedUser
                                 }</span></p>
                             </div>
                             <button
                                 onClick={handleBackToList}
-                                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+                                className="p-2 flex-shrink-0 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
-                        <div className="bg-red-50 p-3 rounded-lg flex items-center justify-between mb-6 border border-red-100">
-                            <span className="text-xs font-bold text-red-800 uppercase tracking-widest">Fecha Seleccionada:</span>
-                            <span className="text-sm font-bold text-red-900 bg-white px-2 py-1 rounded shadow-sm">{selectedDate}</span>
+                        <div className="bg-red-50 p-2 md:p-3 rounded-lg flex items-center justify-between mb-4 border border-red-100 flex-shrink-0">
+                            <span className="text-[10px] md:text-xs font-bold text-red-800 uppercase tracking-widest">Fecha Seleccionada:</span>
+                            <span className="text-xs md:text-sm font-bold text-red-900 bg-white px-2 py-1 rounded shadow-sm truncate">{selectedDate}</span>
                         </div>
 
                         {/* KPIS */}
-                        <div className="grid grid-cols-3 gap-3 mb-6">
-                            <div className="bg-blue-50 p-3 rounded-xl text-center border border-blue-100">
-                                <div className="text-2xl font-black text-blue-600">{stats.total}</div>
-                                <div className="text-[10px] uppercase font-bold text-blue-400 tracking-wide mt-1">Total</div>
+                        <div className="grid grid-cols-3 gap-2 md:gap-3 mb-4 flex-shrink-0">
+                            <div className="bg-blue-50 p-2 md:p-3 rounded-xl text-center border border-blue-100">
+                                <div className="text-xl md:text-2xl font-black text-blue-600">{stats.total}</div>
+                                <div className="text-[9px] md:text-[10px] uppercase font-bold text-blue-400 tracking-wide mt-0.5 md:mt-1">Total</div>
                             </div>
-                            <div className="bg-green-50 p-3 rounded-xl text-center border border-green-100">
-                                <div className="text-2xl font-black text-green-600">{stats.visited}</div>
-                                <div className="text-[10px] uppercase font-bold text-green-400 tracking-wide mt-1">Visitados</div>
+                            <div className="bg-green-50 p-2 md:p-3 rounded-xl text-center border border-green-100">
+                                <div className="text-xl md:text-2xl font-black text-green-600">{stats.visited}</div>
+                                <div className="text-[9px] md:text-[10px] uppercase font-bold text-green-400 tracking-wide mt-0.5 md:mt-1">Visitados</div>
                             </div>
-                            <div className="bg-orange-50 p-3 rounded-xl text-center border border-orange-100">
-                                <div className="text-2xl font-black text-orange-600">{stats.pending}</div>
-                                <div className="text-[10px] uppercase font-bold text-orange-400 tracking-wide mt-1">Pendientes</div>
+                            <div className="bg-orange-50 p-2 md:p-3 rounded-xl text-center border border-orange-100">
+                                <div className="text-xl md:text-2xl font-black text-orange-600">{stats.pending}</div>
+                                <div className="text-[9px] md:text-[10px] uppercase font-bold text-orange-400 tracking-wide mt-0.5 md:mt-1">Pendientes</div>
                             </div>
                         </div>
 
                         {/* ASSIGNMENTS LIST */}
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 pr-1 custom-scrollbar min-h-0">
                             {processedList.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-40 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 p-4 text-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <div className="flex flex-col items-center justify-center h-full text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 p-4 text-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 md:h-10 md:w-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                     </svg>
-                                    <p className="text-xs font-medium">No hay rutas asignadas.</p>
+                                    <p className="text-[10px] md:text-xs font-medium">No hay rutas asignadas.</p>
                                 </div>
                             ) : (
                                 processedList.map((task, i) => (
                                     <div 
                                         key={i} 
-                                        className={`p-3 rounded-lg border flex items-center justify-between cursor-pointer hover:bg-gray-100 transition ${task.verified ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}
+                                        className={`p-2 md:p-3 rounded-lg border flex items-center justify-between cursor-pointer hover:bg-gray-100 transition ${task.verified ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100'}`}
                                         onClick={() => {
                                             const marker = pdvMarkerRefs.current[i];
                                             if (marker) {
@@ -538,14 +538,14 @@ const AdminMap = () => {
                                         }}
                                     >
                                         <div className="flex-1 min-w-0 mr-2">
-                                            <p className={`text-sm font-bold truncate ${task.verified ? 'text-green-800' : 'text-gray-800'}`}>{task.name}</p>
-                                            <p className="text-xs text-gray-500 truncate">{task.address || task.distrito || task.speciality}</p>
+                                            <p className={`text-xs md:text-sm font-bold truncate ${task.verified ? 'text-green-800' : 'text-gray-800'}`}>{task.name}</p>
+                                            <p className="text-[10px] md:text-xs text-gray-500 truncate">{task.address || task.distrito || task.speciality}</p>
                                         </div>
-                                        <div>
+                                        <div className="flex-shrink-0">
                                             {task.verified ? (
-                                                <span className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm">VISITADO</span>
+                                                <span className="bg-green-500 text-white text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded-full shadow-sm whitespace-nowrap">VISITADO</span>
                                             ) : (
-                                                <span className="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-full border border-orange-200">PENDIENTE</span>
+                                                <span className="bg-orange-100 text-orange-600 text-[9px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-orange-200 whitespace-nowrap">PENDIENTE</span>
                                             )}
                                         </div>
                                     </div>
@@ -555,9 +555,9 @@ const AdminMap = () => {
 
                         <button
                             onClick={handleBackToList}
-                            className="w-full py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                            className="w-full py-2.5 md:py-3 bg-red-600 text-white font-bold text-sm md:text-base rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 flex-shrink-0"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-11a1 1 0 112 0 1 1 0 01-2 0zm.707 9.293a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L11 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2z" clipRule="evenodd" />
                             </svg>
                             Volver al Mapa Completo
@@ -567,15 +567,15 @@ const AdminMap = () => {
             </div>
 
             {/* RIGHT PANEL: Map */}
-            <div className="w-2/3 h-full relative">
+            <div className="w-full md:w-2/3 h-[55%] md:h-full relative order-1 md:order-2">
                 {/* Date Picker Overlay */}
-                <div className="absolute top-4 right-4 z-[1000] bg-white p-3 rounded-xl shadow-2xl border border-gray-200">
-                    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Fecha de Recorrido</label>
+                <div className="absolute top-2 right-2 md:top-4 md:right-4 z-[1000] bg-white p-2 md:p-3 rounded-xl shadow-md md:shadow-2xl border border-gray-200">
+                    <label className="block text-[10px] md:text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Fecha de Recorrido</label>
                     <input
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 w-40"
+                        className="border border-gray-300 rounded-lg px-2 py-1 md:px-3 md:py-2 text-xs md:text-sm font-semibold text-gray-700 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 w-32 md:w-40"
                     />
                 </div>
 
