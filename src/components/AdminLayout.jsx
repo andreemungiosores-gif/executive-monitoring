@@ -24,13 +24,13 @@ const AdminLayout = () => {
             {/* Mobile overlay */}
             {isSidebarOpen && (
                 <div 
-                    className="fixed inset-0 bg-black/50 z-20 md:hidden transition-opacity" 
+                    className="fixed inset-0 bg-black/50 z-[4000] md:hidden transition-opacity" 
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
             {/* Sidebar */}
-            <aside className={`fixed md:static inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-white w-64 shadow-xl flex flex-col z-30`}>
+            <aside className={`fixed md:static inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 transition-transform duration-300 ease-in-out bg-white w-64 shadow-xl flex flex-col z-[5000]`}>
                 <div className="h-16 md:h-20 flex items-center justify-between px-4 border-b border-gray-100 flex-shrink-0">
                     <div className="flex-1 flex justify-center md:justify-center">
                         <img
@@ -97,8 +97,8 @@ const AdminLayout = () => {
             {/* Main Content */}
             <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-gray-50 relative">
                 {/* Mobile Header Toggle */}
-                <div className="md:hidden bg-white h-16 border-b border-gray-100 flex items-center justify-between px-4 flex-shrink-0 z-10 shadow-sm">
-                    <button onClick={toggleSidebar} className="text-gray-600 hover:text-gray-900 focus:outline-none p-2 -ml-2 rounded-lg">
+                <div className="md:hidden bg-white h-16 border-b border-gray-100 flex items-center justify-between px-4 flex-shrink-0 z-[3000] shadow-sm relative">
+                    <button onClick={toggleSidebar} className="text-gray-600 hover:text-gray-900 focus:outline-none p-2 -ml-2 rounded-lg relative z-[3000]">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                     </button>
                     <div className="flex-1 flex justify-center">
