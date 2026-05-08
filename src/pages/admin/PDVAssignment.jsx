@@ -298,11 +298,22 @@ const PDVAssignment = () => {
     // but maybe we want to visualize which ones are already added?)
     // Let's keep them in the list but show an "Added" state button.
 
-    const filteredPdvs = pdvs.filter(p =>
-        (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.district.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        p.active // Only show active
-    );
+    const normalizeText = (text) => {
+        if (!text) return "";
+        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    };
+
+    const normalizedSearch = normalizeText(searchTerm);
+
+    const filteredPdvs = pdvs.filter(p => {
+        if (!p.active) return false;
+        if (!normalizedSearch) return true;
+        
+        const normalizedName = normalizeText(p.name);
+        const normalizedDistrict = normalizeText(p.district);
+        
+        return normalizedName.includes(normalizedSearch) || normalizedDistrict.includes(normalizedSearch);
+    });
 
 
     return (
