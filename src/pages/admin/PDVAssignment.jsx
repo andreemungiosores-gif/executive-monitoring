@@ -450,7 +450,7 @@ const PDVAssignment = () => {
                                         </div>
                                         <div className="min-w-0">
                                             <h4 className="font-bold text-gray-800 text-sm truncate">{pdv.name}</h4>
-                                            <p className="text-xs text-gray-500 truncate">{pdv.district}</p>
+                                            <p className="text-xs text-gray-500 truncate">{pdv.address || pdv.district}</p>
                                         </div>
                                     </div>
 

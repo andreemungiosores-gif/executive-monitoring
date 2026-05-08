@@ -387,6 +387,9 @@ const AdminMap = () => {
     const offsetCalc = new Date().getTimezoneOffset() * 60000;
     const isTodaySync = selectedDate === new Date(Date.now() - offsetCalc).toISOString().split('T')[0];
 
+    // Show all active sellers
+    activeIds.forEach(k => keysToShow.add(k));
+
     // Only registered users who are currently tracking their locations should appear
     Object.keys(locations).forEach(k => {
         if (lookupFull.has(k)) keysToShow.add(k);
