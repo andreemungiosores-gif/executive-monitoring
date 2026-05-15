@@ -162,23 +162,24 @@ const PDVAssignment = () => {
             // API Endpoint for file content
             const apiUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/clients.csv';
 
+            // Use the raw media type to get the file contents directly, bypassing base64 decoding and 1MB API limits
             const response = await fetch(apiUrl, {
                 headers: {
                     'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json'
+                    'Accept': 'application/vnd.github.v3.raw'
                 }
             });
 
             if (!response.ok) throw new Error(`Error API GitHub: ${response.status} ${response.statusText}`);
 
-            const data = await response.json();
-
-            // Decode base64 content safely (UTF-8 support)
-            const text = decodeURIComponent(escape(window.atob(data.content.replace(/\s/g, ''))));
+            // Get the raw text directly
+            const text = await response.text();
 
             Papa.parse(text, {
                 header: true,
                 skipEmptyLines: true,
+                // Automatically handle BOM and uppercase/lowercase issues with new columns
+                transformHeader: (header) => header.trim().replace(/^\uFEFF/, '').toLowerCase(),
                 complete: async (results) => {
                     const updates = {};
                     let count = 0;
