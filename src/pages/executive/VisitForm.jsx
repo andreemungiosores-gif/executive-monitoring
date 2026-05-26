@@ -6,12 +6,10 @@ import { db } from '../../firebase';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Share } from '@capacitor/share';
 import { Geolocation } from '@capacitor/geolocation';
+import { supabase } from '../../utils/supabaseClient.js';
 
 const formatDateStr = (dateVal) => {
-    // Expected Output: "2025-08-13 18:19:47"
-    const d = new Date(dateVal);
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    return new Date(dateVal).toISOString();
 };
 
 const formatTimeDiff = (start, end) => {
@@ -59,87 +57,32 @@ const VisitForm = () => {
 
     const { pdvName } = visit;
 
-    const uploadPhotoToGithub = async (photo, userId) => {
-        const token = import.meta.env.VITE_GITHUB_TOKEN;
-        
-        // Convert to Blob then Base64
+    const uploadPhotoToSupabase = async (photo, userId) => {
         const response = await fetch(photo.webPath);
         const blob = await response.blob();
         
-        const base64Data = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result.replace(/^data:.+;base64,/, '');
-                resolve(base64String);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-
         const timestamp = Date.now();
         const filename = `visita_${userId}_${timestamp}.jpg`;
-        const apiUrl = `https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/photos_users/${filename}`;
         
-        const putRes = await fetch(apiUrl, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: `upload: photo ${filename}`,
-                content: base64Data
-            })
-        });
+        const { data, error } = await supabase.storage
+            .from('visits_photos')
+            .upload(filename, blob, {
+                contentType: 'image/jpeg',
+                upsert: false
+            });
+            
+        if (error) throw new Error("Error subiendo foto a Supabase: " + error.message);
         
-        if (!putRes.ok) throw new Error("Error subiendo foto a GitHub");
-        
-        return `/db/photos_users/${filename}`;
+        const { data: publicUrlData } = supabase.storage
+            .from('visits_photos')
+            .getPublicUrl(filename);
+            
+        return publicUrlData.publicUrl;
     };
 
-    const uploadCSVToGithub = async (csvRow) => {
-        const token = import.meta.env.VITE_GITHUB_TOKEN;
-        const repoUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/visits_reports.csv';
-
-        // 1. Fix crítico: Obtener solo el SHA del archivo maestro para el guardado. 
-        // GitHub API `/contents` oculta el código base64 truncando el archivo si pesa más de 1MB.
-        const getRes = await fetch(repoUrl, { headers: { 'Authorization': `token ${token}` } });
-        if (!getRes.ok) throw new Error("Error obteniendo metadata de visits_reports.csv");
-
-        const json = await getRes.json();
-        const sha = json.sha;
-
-        // 2. Descargar el historial completo intacto desde Raw User Content (By-pass límites de Megabytes).
-        // Usamos cache busting t=Date.now()
-        const rawUrl = `https://raw.githubusercontent.com/medicaltech-peru/fullstack-template/main/frontend/public/db/visits_reports.csv?t=${Date.now()}`;
-        const rawRes = await fetch(rawUrl, { headers: { 'Authorization': `token ${token}` } });
-        if (!rawRes.ok) throw new Error("Error extrayendo los datos puros RAW de visits_reports.csv");
-        
-        const decodedContent = await rawRes.text();
-
-        // 3. Empalmar filas y reconvertir a UTF-8 base 64 final.
-        const newCsv = decodedContent.trim() + '\n' + csvRow;
-
-        const encoder = new TextEncoder();
-        const encodedBytes = encoder.encode(newCsv);
-        let binStr = "";
-        for(let i=0; i<encodedBytes.length; i++) binStr += String.fromCharCode(encodedBytes[i]);
-        const base64Payload = window.btoa(binStr);
-
-        const putRes = await fetch(repoUrl, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: `add: visit report csv row`,
-                content: base64Payload,
-                sha: sha
-            })
-        });
-
-        if (!putRes.ok) throw new Error("Error grabando registro en visits_reports.csv");
+    const saveVisitToSupabase = async (visitData) => {
+        const { error } = await supabase.from('visits_reports').insert([visitData]);
+        if (error) throw new Error("Error grabando registro en Supabase: " + error.message);
     };
 
     const handleSubmit = async (e) => {
@@ -214,37 +157,35 @@ const VisitForm = () => {
             }).catch(e => console.warn("Share to native cancelled or failed", e));
             
             // OPTIMIZATION 3: While Whatsapp share is open, Network uploads in the background!
-            const photoUrl = await uploadPhotoToGithub(photoData, user.id);
+            const photoUrl = await uploadPhotoToSupabase(photoData, user.id);
 
-            // Construct row payload
-            const rowArr = [
-                startStr,
-                endStr,
-                timeDiff,
-                lat,
-                lng,
-                "", // distancia_pdv_metros
-                "Reporte de Visita",
-                "", // ID PDV
-                visit.id || "", // id_pdv
-                user.id || "", // id_usuario
-                photoUrl,
-                comentario,
-                fullRecStr,
-                fullEstadoStr,
-                "", // tematica_visita
-                ""  // is_llm_categorized
-            ];
+            // Construct payload
+            const visitPayload = {
+                fecha_inicio_form: startStr || null,
+                fecha_fin_form: endStr || null,
+                tiempo_form: timeDiff || null,
+                latitud_ingreso: lat === "" ? null : parseFloat(lat),
+                longitud_ingreso: lng === "" ? null : parseFloat(lng),
+                distancia_pdv_metros: null,
+                formulario: "Reporte de Visita",
+                id_pdv: visit.id || null,
+                id_usuario: user.id || null,
+                evidencia_fotografica: photoUrl || null,
+                comentario_visita: comentario || null,
+                recepcion_visita: fullRecStr || null,
+                estado_seguimiento: fullEstadoStr || null,
+                tematica_visita: null,
+                is_llm_categorized: null
+            };
 
-            const csvRow = rowArr.map(escapeCSV).join(',');
-            await uploadCSVToGithub(csvRow);
+            await saveVisitToSupabase(visitPayload);
 
             // Await Share wrapper to ensure smooth unmount. 
             await nativeSharePromise;
             
             navigate(-1);
         } catch (error) {
-            console.error("Error al publicar reporte en Github", error);
+            console.error("Error al publicar reporte en Supabase", error);
             alert("Error de Sincronización: " + error.message);
             setSubmitting(false);
         }

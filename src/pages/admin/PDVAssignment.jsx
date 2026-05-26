@@ -27,29 +27,11 @@ const PDVAssignment = () => {
     useEffect(() => {
         const loadVendors = async () => {
             try {
-                const token = import.meta.env.VITE_GITHUB_TOKEN;
-                const url = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
-                
-                if (!token) return;
-                
-                const res = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
-                if (!res.ok) throw new Error("Error fetching users");
-                
-                const json = await res.json();
-                const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
-                
-                const lines = decodedContent.trim().split('\n');
-                const headers = lines[0].split(',').map(h => h.trim());
-                
-                const parsedUsers = lines.slice(1).map(line => {
-                    const values = line.split(',');
-                    return headers.reduce((obj, header, i) => {
-                        obj[header] = values[i] !== undefined ? values[i].trim() : '';
-                        return obj;
-                    }, {});
-                });
+                const { supabase } = await import('../../utils/supabaseClient.js');
+                const { data: parsedUsers, error } = await supabase.from('users').select('*');
+                if (error) throw new Error("Error fetching users from Supabase");
 
-                const activeSellers = parsedUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
+                const activeSellers = parsedUsers.filter(u => u.is_active === true || u.is_active === 'True' || u.is_active === 'true');
                 
                 const vendorList = activeSellers.map(u => {
                     const realName = u.nombre_apellido;
@@ -70,16 +52,74 @@ const PDVAssignment = () => {
         loadVendors();
     }, []);
 
-    // 2. Load PDVs (Master Data)
+    // 2. Load PDVs (Master Data) directly from Supabase
     useEffect(() => {
-        const pdvRef = ref(db, 'pdvs');
-        onValue(pdvRef, (snapshot) => {
-            if (snapshot.exists()) {
-                setPdvs(Object.values(snapshot.val()));
-            } else {
-                setPdvs([]);
+        const loadPdvs = async () => {
+            try {
+                const { supabase } = await import('../../utils/supabaseClient.js');
+                
+                let results = [];
+                let from = 0;
+                const step = 1000;
+                let hasMore = true;
+
+                while (hasMore) {
+                    const { data, error } = await supabase
+                        .from('clients')
+                        .select('*')
+                        .range(from, from + step - 1);
+                        
+                    if (error) throw error;
+                    if (data && data.length > 0) {
+                        results = [...results, ...data];
+                        from += step;
+                        if (data.length < step) hasMore = false;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+                
+                const pdvList = [];
+                results.forEach(row => {
+                    const lat = parseFloat(row.latitud);
+                    const lng = parseFloat(row.longitud);
+
+                    if (row.id_pdv && !isNaN(lat) && !isNaN(lng)) {
+                        let nameParts = [];
+                        if (row.centro_medico && row.centro_medico.trim()) nameParts.push(row.centro_medico.trim());
+                        if (row.doctor && row.doctor.trim()) {
+                            let docName = row.doctor.trim();
+                            if (!docName.toLowerCase().startsWith('dr') && !docName.toLowerCase().startsWith('dra')) {
+                                docName = "Dr(a). " + docName;
+                            }
+                            nameParts.push(docName);
+                        }
+                        let name = nameParts.length > 0 ? nameParts.join(" - ") : "Sin Nombre";
+
+                        const rawActive = row.is_active ? row.is_active.toString().trim() : "";
+                        const isActive = rawActive !== "0" && rawActive.toLowerCase() !== "false";
+                        
+                        pdvList.push({
+                            id: row.id_pdv,
+                            name: name,
+                            address: row.direccion || "",
+                            district: row.distrito || "",
+                            category: row.categoria || "",
+                            speciality: row.especialidad || "",
+                            latitude: lat,
+                            longitude: lng,
+                            active: isActive
+                        });
+                    }
+                });
+                
+                setPdvs(pdvList);
+            } catch (e) {
+                console.error("Error loading PDVs from Supabase", e);
             }
-        });
+        };
+        
+        loadPdvs();
     }, []);
 
     // 3. Load Assignments for Selected Date/Vendor
@@ -127,14 +167,33 @@ const PDVAssignment = () => {
             setSaveStatus('saving');
             const assignRef = ref(db, `assignments/${selectedDate}/${selectedVendor}`);
 
-            // Convert Array to Object for Firebase
+            // 1. Fetch latest state from Firebase to prevent overwriting vendor's live progress
+            const snap = await get(assignRef);
+            const liveData = snap.exists() ? snap.val() : {};
+
+            // 2. Convert Array to Object for Firebase
             const updateObj = {};
             assignedPdvs.forEach(p => {
-                updateObj[p.id] = p; // Use PDV ID as key
+                const liveItem = liveData[p.id] || {};
+                
+                const mergedP = { ...p };
+                if (liveItem.status !== undefined) mergedP.status = liveItem.status;
+                if (liveItem.verified !== undefined) mergedP.verified = liveItem.verified;
+                if (liveItem.checkInTime !== undefined) mergedP.checkInTime = liveItem.checkInTime;
+                if (liveItem.checkOutTime !== undefined) mergedP.checkOutTime = liveItem.checkOutTime;
+                if (liveItem.fechaInicioForm !== undefined) mergedP.fechaInicioForm = liveItem.fechaInicioForm;
+
+                // Firebase will crash if any property is explicitly undefined
+                Object.keys(mergedP).forEach(key => {
+                    if (mergedP[key] === undefined) {
+                        delete mergedP[key];
+                    }
+                });
+
+                updateObj[p.id] = mergedP;
             });
 
-            // If empty, we set null to delete node? Or empty object?
-            // Firebase 'set' with null deletes the path.
+            // 3. Save
             if (assignedPdvs.length === 0) {
                 await set(assignRef, null);
             } else {
@@ -150,148 +209,7 @@ const PDVAssignment = () => {
         }
     };
 
-    // --- SYNC FUNCTION (Preserved) ---
-    const syncPdvsFromGitHub = async () => {
-        // Use GitHub API (more robust for private repos + CORS)
-        console.log("Attempting GitHub API fetch...");
-        setImporting(true);
-        try {
-            // Usa una variable de entorno para seguridad. En producción define VITE_GITHUB_TOKEN en Vercel.
-            // Para modo de desarrollo local deberás crear un archivo .env
-            const token = import.meta.env.VITE_GITHUB_TOKEN;
-            // API Endpoint for file content
-            const apiUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/clients.csv';
 
-            // Use the raw media type to get the file contents directly, bypassing base64 decoding and 1MB API limits
-            const response = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3.raw'
-                }
-            });
-
-            if (!response.ok) throw new Error(`Error API GitHub: ${response.status} ${response.statusText}`);
-
-            // Get the raw text directly
-            const text = await response.text();
-
-            Papa.parse(text, {
-                header: true,
-                skipEmptyLines: true,
-                // Automatically handle BOM and uppercase/lowercase issues with new columns
-                transformHeader: (header) => header.trim().replace(/^\uFEFF/, '').toLowerCase(),
-                complete: async (results) => {
-                    const updates = {};
-                    let count = 0;
-
-                    results.data.forEach(row => {
-                        const lat = parseFloat(row.latitud);
-                        const lng = parseFloat(row.longitud);
-
-                        if (row.id_pdv && !isNaN(lat) && !isNaN(lng)) {
-                            let nameParts = [];
-                            if (row.centro_medico && row.centro_medico.trim()) {
-                                nameParts.push(row.centro_medico.trim());
-                            }
-                            if (row.doctor && row.doctor.trim()) {
-                                let docName = row.doctor.trim();
-                                if (!docName.toLowerCase().startsWith('dr') && !docName.toLowerCase().startsWith('dra')) {
-                                    docName = "Dr(a). " + docName;
-                                }
-                                nameParts.push(docName);
-                            }
-                            let name = nameParts.length > 0 ? nameParts.join(" - ") : "Sin Nombre";
-
-                            // Logic for Active status (1 or empty = Active, 0 = Inactive)
-                            const rawActive = row.is_active ? row.is_active.toString().trim() : "";
-                            const isActive = rawActive !== "0" && rawActive.toLowerCase() !== "false";
-
-                            // Logic to parse schedule from (7,8,9) format
-                            const getSchedule = (r) => {
-                                const days = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-                                const dayNames = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sáb', 'Dom'];
-                                let scheduleObj = {};
-                                
-                                days.forEach((d, idx) => {
-                                    const val = r[`horas_${d}`];
-                                    if (val && val !== '()' && val !== '[]') {
-                                        const nums = val.replace(/[\[\]\(\)]/g, '').split(',')
-                                            .map(n => parseInt(n.trim()))
-                                            .filter(n => !isNaN(n))
-                                            .sort((a,b) => a-b);
-                                        if (nums.length > 0) {
-                                            const start = nums[0].toString().padStart(2, '0') + ':00';
-                                            const end = (nums[nums.length - 1] + 1).toString().padStart(2, '0') + ':00';
-                                            const timeStr = `${start} - ${end}`;
-                                            
-                                            if (!scheduleObj[timeStr]) scheduleObj[timeStr] = [];
-                                            scheduleObj[timeStr].push(dayNames[idx]);
-                                        }
-                                    }
-                                });
-                                
-                                let parts = [];
-                                for (let time in scheduleObj) {
-                                    let daysList = scheduleObj[time];
-                                    let daysStr = daysList.join(', ');
-                                    // Summarize Lun-Vie if all 5 week days are identical
-                                    if (daysList.length === 5 && daysList.includes('Lun') && daysList.includes('Vie') && !daysList.includes('Sáb') && !daysList.includes('Dom')) {
-                                        daysStr = "Lun-Vie";
-                                    }
-                                    parts.push(`${daysStr}: ${time}`);
-                                }
-                                return parts.join(' | ');
-                            };
-
-                            let phoneParts = [];
-                            ['numero', 'numero_1', 'numero_2', 'numero_3', 'otros_contacto', 'celulares', 'celular', 'telefono'].forEach(col => {
-                                if (row[col] && row[col].toString().trim()) {
-                                    phoneParts.push(row[col].toString().trim());
-                                }
-                            });
-                            let uniquePhones = [...new Set(phoneParts)];
-                            const combinedPhone = uniquePhones.join(' / ');
-
-                            updates[row.id_pdv] = {
-                                id: row.id_pdv,
-                                name: name,
-                                address: row.direccion || "",
-                                district: row.distrito || "",
-                                category: row.categoria || "",
-                                speciality: row.especialidad || "",
-                                phone: combinedPhone,
-                                schedule: getSchedule(row),
-                                latitude: lat,
-                                longitude: lng,
-                                zona: row.zona || "",
-                                active: isActive,
-                                timestamp: Date.now()
-                            };
-                            count++;
-                        }
-                    });
-
-                    if (count > 0) {
-                        await set(ref(db, 'pdvs'), updates);
-                        alert(`¡Sincronización Exitosa! Se actualizaron ${count} registros desde GitHub.`);
-                    } else {
-                        alert("No se encontraron registros válidos en el CSV remoto.");
-                    }
-                    setImporting(false);
-                },
-                error: (err) => {
-                    console.error("CSV Parse Error:", err);
-                    alert("Error al procesar el CSV de GitHub");
-                    setImporting(false);
-                }
-            });
-
-        } catch (error) {
-            console.error("Sync Error:", error);
-            alert("Error al sincronizar: " + error.message);
-            setImporting(false);
-        }
-    };
 
 
     // --- FILTERING ---
@@ -299,21 +217,19 @@ const PDVAssignment = () => {
     // but maybe we want to visualize which ones are already added?)
     // Let's keep them in the list but show an "Added" state button.
 
-    const normalizeText = (text) => {
-        if (!text) return "";
-        return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normalizeString = (str) => {
+        if (!str) return '';
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     };
-
-    const normalizedSearch = normalizeText(searchTerm);
 
     const filteredPdvs = pdvs.filter(p => {
         if (!p.active) return false;
-        if (!normalizedSearch) return true;
+        if (!searchTerm.trim()) return true;
         
-        const normalizedName = normalizeText(p.name);
-        const normalizedDistrict = normalizeText(p.district);
+        const searchTerms = normalizeString(searchTerm).split(' ').filter(term => term.trim() !== '');
+        const combinedText = normalizeString(`${p.name || ''} ${p.district || ''}`);
         
-        return normalizedName.includes(normalizedSearch) || normalizedDistrict.includes(normalizedSearch);
+        return searchTerms.every(term => combinedText.includes(term));
     });
 
 
@@ -348,15 +264,6 @@ const PDVAssignment = () => {
                         ))}
                     </select>
 
-                    {/* Sync Button (Mini) */}
-                    <button
-                        onClick={syncPdvsFromGitHub}
-                        disabled={importing}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
-                        title="Sincronizar Data Maestra (GitHub)"
-                    >
-                        <svg className={`w-6 h-6 ${importing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    </button>
                 </div>
             </div>
 

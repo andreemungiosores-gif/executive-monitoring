@@ -19,6 +19,7 @@
     "@capacitor/geolocation": "^8.0.0",
     "@capacitor/share": "^8.0.1",
     "@react-google-maps/api": "^2.20.8",
+    "@supabase/supabase-js": "^2.106.2",
     "autoprefixer": "^10.4.23",
     "firebase": "^12.7.0",
     "leaflet": "^1.9.4",

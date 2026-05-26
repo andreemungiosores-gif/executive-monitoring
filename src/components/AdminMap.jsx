@@ -321,29 +321,12 @@ const AdminMap = () => {
     useEffect(() => {
         const loadGithubUsers = async () => {
             try {
-                const token = import.meta.env.VITE_GITHUB_TOKEN;
-                const url = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
-                if (!token) return;
-                
-                const res = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
-                if (!res.ok) return;
-                
-                const json = await res.json();
-                const decoded = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
-                
-                const lines = decoded.trim().split('\n');
-                const headers = lines[0].split(',').map(h => h.trim());
-                
-                const parsedUsers = lines.slice(1).map(line => {
-                    const values = line.split(',');
-                    return headers.reduce((obj, header, i) => {
-                        obj[header] = values[i] !== undefined ? values[i].trim() : '';
-                        return obj;
-                    }, {});
-                });
+                const { supabase } = await import('../utils/supabaseClient.js');
+                const { data: parsedUsers, error } = await supabase.from('users').select('*');
+                if (error) throw new Error("Error loading users from Supabase");
 
                 const vendorList = parsedUsers.map(u => {
-                    const isActive = u.is_active === 'True' || u.is_active === 'true';
+                    const isActive = u.is_active === true || u.is_active === 'True' || u.is_active === 'true';
                     const baseName = u.nombre_apellido;
                     const baseShort = u.nombre_corto || u.nombre_apellido;
                     

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ref, onValue } from 'firebase/database';
 import { db } from '../../firebase';
@@ -77,6 +77,7 @@ const pdvCompletedIcon = L.divIcon({
 const ExecutiveRouteMap = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [visits, setVisits] = useState([]);
     const [myLocation, setMyLocation] = useState(null);
 
@@ -118,8 +119,9 @@ const ExecutiveRouteMap = () => {
         const d = new Date();
         const offset = d.getTimezoneOffset() * 60000;
         const todayStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
+        const targetDateStr = location.state?.dateStr || todayStr;
         
-        const assignmentsRef = ref(db, `assignments/${todayStr}/${user.username}`);
+        const assignmentsRef = ref(db, `assignments/${targetDateStr}/${user.username}`);
         const unsubAssign = onValue(assignmentsRef, (snap) => {
             if (snap.exists()) {
                 const data = snap.val();

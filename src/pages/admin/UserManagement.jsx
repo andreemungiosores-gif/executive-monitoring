@@ -1,28 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const apiUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
-
-const parseCSV = (csv) => {
-    const lines = csv.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
-    return lines.slice(1).map(line => {
-        const values = line.split(',');
-        return headers.reduce((obj, header, i) => {
-            obj[header] = values[i] !== undefined ? values[i].trim() : '';
-            return obj;
-        }, {});
-    });
-};
-
-const stringifyCSV = (data) => {
-    if (data.length === 0) return '';
-    const headers = Object.keys(data[0]);
-    const csv = [
-        headers.join(','),
-        ...data.map(row => headers.map(h => row[h] || '').join(','))
-    ].join('\n');
-    return csv;
-};
+import { supabase } from '../../utils/supabaseClient.js';
 
 const UserManagement = () => {
     const [allUsers, setAllUsers] = useState([]);
@@ -41,23 +19,11 @@ const UserManagement = () => {
     const loadUsers = async () => {
         setIsLoading(true);
         try {
-            const token = import.meta.env.VITE_GITHUB_TOKEN;
-            if (!token) throw new Error("Falta el TOKEN de Github en las variables de entorno.");
-
-            const res = await fetch(apiUrl, {
-                headers: { 'Authorization': `token ${token}` }
-            });
-            if (!res.ok) throw new Error("Error al obtener el archivo desde Github.");
+            const { data: parsed, error } = await supabase.from('users').select('*');
+            if (error) throw error;
             
-            const json = await res.json();
-            setFileSha(json.sha);
-            
-            const decodedContent = decodeURIComponent(escape(window.atob(json.content.replace(/\n/g, ''))));
-            let parsed = parseCSV(decodedContent);
-            
-            parsed = parsed.map(u => {
+            parsed.forEach(u => {
                 if (typeof u.pass === 'undefined') u.pass = "123";
-                return u;
             });
             
             setAllUsers(parsed);
@@ -69,36 +35,7 @@ const UserManagement = () => {
         }
     };
 
-    const saveToGitHub = async (updatedDataStr) => {
-        try {
-            const token = import.meta.env.VITE_GITHUB_TOKEN;
-            const contentEncoded = window.btoa(unescape(encodeURIComponent(updatedDataStr)));
-
-            const response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: 'Update users.csv passwords and accounts via Dashboard',
-                    content: contentEncoded,
-                    sha: fileSha
-                })
-            });
-
-            if (!response.ok) throw new Error("Error al hacer push o el archivo fue modificado externamente.");
-
-            const json = await response.json();
-            setFileSha(json.content.sha); 
-            return true;
-        } catch (e) {
-            console.error(e);
-            alert("No se pudo guardar en GitHub: " + e.message);
-            return false;
-        }
-    };
+    // Note: saveToGitHub is removed, handled inline below
 
     const handleCreateSeller = async (e) => {
         e.preventDefault();
@@ -115,51 +52,60 @@ const UserManagement = () => {
             pass: newSeller.pass
         };
 
+        const { error } = await supabase.from('users').insert([newUserObj]);
+        if (error) {
+            alert("Error al crear vendedor: " + error.message);
+            return;
+        }
+
         const updatedList = [...allUsers, newUserObj];
         setAllUsers(updatedList);
         
         setIsAddModalOpen(false);
         setNewSeller({ nombre_corto: '', nombre_apellido: '', pass: '123' });
-
-        const csvString = stringifyCSV(updatedList);
-        const success = await saveToGitHub(csvString);
-        if (success) alert("Vendedor creado y sincronizado a GitHub con éxito.");
+        alert("Vendedor creado con éxito.");
     };
 
     const handleUpdateSeller = async (e) => {
         e.preventDefault();
         if (!editingUser.nombre_corto || !editingUser.nombre_apellido) return;
 
+        const { error } = await supabase.from('users').update(editingUser).eq('id_usuario', editingUser.id_usuario);
+        if (error) {
+            alert("Error al actualizar: " + error.message);
+            return;
+        }
+
         const updatedList = allUsers.map(u => u.id_usuario === editingUser.id_usuario ? editingUser : u);
         setAllUsers(updatedList);
         setEditingUser(null);
-
-        const csvString = stringifyCSV(updatedList);
-        const success = await saveToGitHub(csvString);
-        if (success) alert("Vendedor actualizado en Github.");
+        alert("Vendedor actualizado.");
     };
 
     const handleDeleteSeller = async (id, name) => {
-        if (!window.confirm(`¿Estás sumamente seguro de eliminar PERMANENTEMENTE a ${name} de users.csv de Github?`)) return;
+        if (!window.confirm(`¿Estás sumamente seguro de eliminar PERMANENTEMENTE a ${name}?`)) return;
         
+        const { error } = await supabase.from('users').delete().eq('id_usuario', id);
+        if (error) {
+            alert("Error al eliminar: " + error.message);
+            return;
+        }
+
         // Remove permanently from memory buffer
         const updatedList = allUsers.filter(u => u.id_usuario !== id);
         setAllUsers(updatedList);
-        
-        const csvString = stringifyCSV(updatedList);
-        const success = await saveToGitHub(csvString);
-        if (success) alert("Vendedor eliminado correctamente de la base de github.");
+        alert("Vendedor eliminado correctamente.");
     };
 
     // Show active sellers conceptually
-    const displaySellers = allUsers.filter(u => u.is_active === 'True' || u.is_active === 'true');
+    const displaySellers = allUsers.filter(u => u.is_active === true || u.is_active === 'True' || u.is_active === 'true');
 
     return (
         <div className="p-4 md:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-gray-800">Gestión de Vendedores (Sincronizado)</h2>
-                    <p className="text-sm md:text-base text-gray-500">Conectado en vivo con GitHub: `users.csv`</p>
+                    <p className="text-sm md:text-base text-gray-500">Conectado en vivo con Supabase</p>
                 </div>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
@@ -261,7 +207,7 @@ const UserManagement = () => {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[2000] p-4">
                     <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-bold mb-4">Crear Vendedor</h3>
-                        <p className="text-sm text-gray-500 mb-4">Se creará con un ID único y la contraseña "123" por defecto directamente en Github.</p>
+                        <p className="text-sm text-gray-500 mb-4">Se creará con un ID único y la contraseña "123" por defecto.</p>
                         <form onSubmit={handleCreateSeller} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Corto (Ej. Juan Perez)</label>

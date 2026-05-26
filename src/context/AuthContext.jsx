@@ -29,36 +29,10 @@ export const AuthProvider = ({ children }) => {
                     return finishLogin(userData, resolve);
                 }
 
-                // 2. Check GitHub Users CSV
-                const apiUrl = 'https://api.github.com/repos/medicaltech-peru/fullstack-template/contents/frontend/public/db/users.csv';
-                const token = import.meta.env.VITE_GITHUB_TOKEN;
-                
-                if (!token) throw new Error("Contacta a soporte, Token no integrado en el Build.");
-
-                const res = await fetch(apiUrl, { headers: { 'Authorization': `token ${token}` } });
-                if (!res.ok) throw new Error("Error conectando con base de datos de usuarios.");
-
-                const json = await res.json();
-                
-                // Decode properly solving unicode issues
-                const binaryStr = window.atob(json.content.replace(/\n/g, ''));
-                const len = binaryStr.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binaryStr.charCodeAt(i);
-                }
-                const decoder = new TextDecoder('utf-8');
-                const decodedContent = decoder.decode(bytes);
-                
-                const lines = decodedContent.trim().split('\n');
-                const headers = lines[0].split(',').map(h => h.trim());
-                const parsedUsers = lines.slice(1).map(line => {
-                    const values = line.split(',');
-                    return headers.reduce((obj, header, i) => {
-                        obj[header] = values[i] !== undefined ? values[i].trim() : '';
-                        return obj;
-                    }, {});
-                });
+                // 2. Check Supabase Users Table
+                const { supabase } = await import('../utils/supabaseClient.js');
+                const { data: parsedUsers, error } = await supabase.from('users').select('*');
+                if (error) throw new Error("Error conectando con base de datos de usuarios en Supabase.");
 
                 // Encontrar al usuario permitiendo búsqueda en minúsculas y aceptando nombre completo o corto
                 const targetUser = username.trim().toLowerCase();
@@ -72,7 +46,7 @@ export const AuthProvider = ({ children }) => {
                 if (foundUser) {
                     const validPass = foundUser.pass || "123";
                     if (validPass === password.trim()) {
-                        if (foundUser.is_active !== 'True' && foundUser.is_active !== 'true') {
+                        if (foundUser.is_active !== true && foundUser.is_active !== 'True' && foundUser.is_active !== 'true') {
                             throw new Error("El usuario está desactivado por un supervisor");
                         }
 

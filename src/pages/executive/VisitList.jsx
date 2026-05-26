@@ -10,16 +10,19 @@ const VisitList = () => {
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const getTodayStr = () => {
+        const d = new Date();
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().split('T')[0];
+    };
+
+    const [selectedDateStr, setSelectedDateStr] = useState(getTodayStr());
+
     useEffect(() => {
         if (!user || !user.username) return;
 
-        // Use local date for querying
-        const d = new Date();
-        const offset = d.getTimezoneOffset() * 60000;
-        const todayStr = new Date(d.getTime() - offset).toISOString().split('T')[0];
-
         // Path: assignments/DATE/USERNAME
-        const assignmentsRef = ref(db, `assignments/${todayStr}/${user.username}`);
+        const assignmentsRef = ref(db, `assignments/${selectedDateStr}/${user.username}`);
 
         const unsubscribe = onValue(assignmentsRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -46,13 +49,23 @@ const VisitList = () => {
         });
 
         return () => unsubscribe();
-    }, [user]);
+    }, [user, selectedDateStr]);
 
     if (loading) return <div className="p-4 text-center text-gray-400">Cargando visitas...</div>;
 
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-800 px-1">Tu Ruta de Hoy</h3>
+            <div className="flex items-center justify-between px-1">
+                <h3 className="text-lg font-bold text-gray-800">
+                    {selectedDateStr === getTodayStr() ? "Tu Ruta de Hoy" : "Tu Ruta"}
+                </h3>
+                <input 
+                    type="date"
+                    value={selectedDateStr}
+                    onChange={(e) => setSelectedDateStr(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-2 py-1 text-sm bg-white shadow-sm outline-none focus:ring-2 focus:ring-red-500 font-semibold text-gray-700"
+                />
+            </div>
 
             {visits.length === 0 ? (
                 <div className="bg-white p-6 rounded-xl shadow-sm text-center border-dashed border-2 border-gray-100">
@@ -71,7 +84,7 @@ const VisitList = () => {
                             {/* Action Buttons (Mock for now) */}
                             <div className="mt-3 flex gap-2">
 
-                                {visit.status !== 'completed' && (
+                                {visit.status !== 'completed' && selectedDateStr === getTodayStr() && (
                                     <button 
                                         onClick={() => navigate(`/executive/visit/${visit.id}`, { state: { visit } })}
                                         className="text-xs border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg font-semibold"
@@ -100,7 +113,7 @@ const VisitList = () => {
             {visits.length > 0 && (
                 <div className="pt-4 pb-2">
                     <button 
-                        onClick={() => navigate('/executive/map')}
+                        onClick={() => navigate('/executive/map', { state: { dateStr: selectedDateStr } })}
                         className="w-full bg-red-600 text-white font-bold py-3.5 rounded-xl shadow-md hover:bg-red-700 transition flex items-center justify-center gap-2"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
