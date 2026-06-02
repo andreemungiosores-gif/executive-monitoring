@@ -121,8 +121,13 @@ const AdminMap = () => {
                                     // Calculate elapsed minutes
                                     const timeDiffMins = Math.abs((pt.timestamp || 0) - (lastValid.timestamp || 0)) / 60000;
                                     
-                                    // Reject GPS spikes: > 1.5km within 3 mins, OR anything completely drastic (> 5km chunk)
-                                    const isSpike = (timeDiffMins < 3 && dist > 1.5) || dist > 5;
+                                    // Calculate speed in km/h if time diff is greater than 10 seconds (0.17 mins)
+                                    const speedKmh = timeDiffMins > 0.17 ? (dist / (timeDiffMins / 60)) : 0;
+                                    
+                                    // Reject GPS spikes:
+                                    // - speed exceeds 180 km/h AND the distance is significant (> 1.5 km)
+                                    // - OR if time difference is extremely small (< 10 seconds) but distance is > 0.5 km
+                                    const isSpike = (speedKmh > 180 && dist > 1.5) || (timeDiffMins <= 0.17 && dist > 0.5);
                                     
                                     if (!isSpike) {
                                         points.push([pt.latitude, pt.longitude]);
@@ -186,7 +191,8 @@ const AdminMap = () => {
                                 let skip = false;
                                 if (lastPoint) {
                                     const dist = getDistance(lastPoint[0], lastPoint[1], lat, lng);
-                                    if (dist > 1.5) skip = true; // Block abrupt >1.5km live jump
+                                    // Block abrupt >20km live jump to filter out extreme glitches, but allow normal city movements
+                                    if (dist > 20.0) skip = true;
                                 }
 
                                 if (!skip) {
