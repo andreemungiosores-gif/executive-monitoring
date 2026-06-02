@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Share } from '@capacitor/share';
 import { ref, update, onValue } from 'firebase/database';
 import { db } from '../../firebase';
+import { supabase } from '../../utils/supabaseClient';
 
 const VisitDetail = () => {
     const { id } = useParams();
@@ -29,6 +30,91 @@ const VisitDetail = () => {
     
     // Status live fetching
     const [liveStatus, setLiveStatus] = useState(visit.status || 'pending');
+
+    // Supabase comments & sales history states
+    const [comments, setComments] = useState([]);
+    const [sales, setSales] = useState([]);
+    const [loadingData, setLoadingData] = useState(true);
+    const [activeTab, setActiveTab] = useState('comments'); // 'comments' or 'sales'
+
+    useEffect(() => {
+        if (!id) return;
+
+        const fetchData = async () => {
+            try {
+                setLoadingData(true);
+                // 1. Fetch last 3 comments from visits_reports
+                const { data: visits, error: vError } = await supabase
+                    .from('visits_reports')
+                    .select('comentario_visita, fecha_inicio_form, id_usuario')
+                    .eq('id_pdv', id)
+                    .order('fecha_inicio_form', { ascending: false })
+                    .limit(3);
+
+                let fetchedComments = [];
+                if (!vError && visits) {
+                    const userIds = [...new Set(visits.map(v => v.id_usuario).filter(Boolean))];
+                    let usersMap = {};
+                    if (userIds.length > 0) {
+                        const { data: users, error: uError } = await supabase
+                            .from('users')
+                            .select('id_usuario, nombre_apellido')
+                            .in('id_usuario', userIds);
+                        if (!uError && users) {
+                            users.forEach(u => {
+                                usersMap[u.id_usuario] = u.nombre_apellido;
+                            });
+                        }
+                    }
+                    fetchedComments = visits.map(v => ({
+                        comentario: v.comentario_visita || 'Sin comentario',
+                        fecha: v.fecha_inicio_form ? new Date(v.fecha_inicio_form).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Fecha desconocida',
+                        vendedor: usersMap[v.id_usuario] || 'Vendedor Desconocido'
+                    }));
+                }
+                setComments(fetchedComments);
+
+                // 2. Fetch sales from clients
+                const { data: clientData, error: cError } = await supabase
+                    .from('clients')
+                    .select('historial_ventas_completo')
+                    .eq('id_pdv', id)
+                    .single();
+
+                if (!cError && clientData && clientData.historial_ventas_completo) {
+                    let salesHistory = clientData.historial_ventas_completo;
+                    if (typeof salesHistory === 'string') {
+                        try {
+                            salesHistory = JSON.parse(salesHistory);
+                        } catch (e) {
+                            salesHistory = [];
+                        }
+                    }
+                    if (Array.isArray(salesHistory)) {
+                        // 1. Sort all sales by date descending
+                        const sortedSales = salesHistory.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+                        
+                        // 2. Extract unique dates
+                        const uniqueDates = [...new Set(sortedSales.map(s => s.fecha).filter(Boolean))];
+                        
+                        // 3. Take the top 3 latest unique dates
+                        const top3Dates = uniqueDates.slice(0, 3);
+                        
+                        // 4. Filter sales to only include those 3 dates
+                        const filteredSales = sortedSales.filter(s => top3Dates.includes(s.fecha));
+                        
+                        setSales(filteredSales);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching detail data:", err);
+            } finally {
+                setLoadingData(false);
+            }
+        };
+
+        fetchData();
+    }, [id]);
 
     React.useEffect(() => {
         if (!user || !user.username || !id) return;
@@ -234,6 +320,65 @@ const VisitDetail = () => {
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Divider */}
+                    <hr className="border-gray-100 my-4" />
+
+                    {/* Tabs Header */}
+                    <div className="flex border-b border-gray-100 mb-4 mt-2">
+                        <button
+                            onClick={() => setActiveTab('comments')}
+                            className={`flex-1 pb-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === 'comments' ? 'border-[#E83C30] text-[#E83C30]' : 'border-transparent text-gray-400'}`}
+                        >
+                            Últimas Visitas ({comments.length})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('sales')}
+                            className={`flex-1 pb-2.5 text-xs font-bold border-b-2 transition-all ${activeTab === 'sales' ? 'border-[#E83C30] text-[#E83C30]' : 'border-transparent text-gray-400'}`}
+                        >
+                            Historial Ventas ({sales.length})
+                        </button>
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                        {loadingData ? (
+                            <div className="py-8 text-center text-xs text-gray-400 animate-pulse">Cargando información...</div>
+                        ) : activeTab === 'comments' ? (
+                            comments.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-gray-400">No hay visitas o comentarios registrados.</div>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {comments.map((c, i) => (
+                                        <div key={i} className="bg-[#F8F9FA] rounded-2xl p-3 border border-gray-100 shadow-sm">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] font-bold text-[#1a2332]">{c.vendedor}</span>
+                                                <span className="text-[9px] text-gray-400 font-semibold">{c.fecha}</span>
+                                            </div>
+                                            <p className="text-xs text-gray-600 italic leading-snug">"{c.comentario}"</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        ) : (
+                            sales.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-gray-400">No hay ventas registradas para este punto.</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {sales.map((s, i) => (
+                                        <div key={i} className="bg-[#F8F9FA] rounded-2xl p-3 border border-gray-100 flex items-center justify-between gap-3 shadow-sm">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-extrabold text-[#1a2332] leading-snug">{s.producto}</p>
+                                                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                                                    {s.fecha ? new Date(s.fecha + 'T00:00:00').toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Fecha desconocida'} • {s.forma_pago || 'Pago no especificado'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        )}
                     </div>
 
                 </div>
