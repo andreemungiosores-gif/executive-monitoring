@@ -7,6 +7,29 @@ import { ref, update, onValue } from 'firebase/database';
 import { db } from '../../firebase';
 import { supabase } from '../../utils/supabaseClient';
 
+// Helper to convert arrays like [9, 10, 11] to "9-12", and [9, 10, 11, 15, 16] to "9-12 y 15-17"
+function formatHoursArray(hoursArray) {
+    if (!Array.isArray(hoursArray) || hoursArray.length === 0) return '';
+    const sorted = [...new Set(hoursArray.map(Number))].sort((a, b) => a - b);
+    
+    const ranges = [];
+    let rangeStart = sorted[0];
+    let rangeEnd = sorted[0];
+    
+    for (let i = 1; i <= sorted.length; i++) {
+        if (i < sorted.length && sorted[i] === rangeEnd + 1) {
+            rangeEnd = sorted[i];
+        } else {
+            ranges.push(`${rangeStart}-${rangeEnd + 1}`);
+            if (i < sorted.length) {
+                rangeStart = sorted[i];
+                rangeEnd = sorted[i];
+            }
+        }
+    }
+    return ranges.join(' y ');
+}
+
 const VisitDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -36,6 +59,10 @@ const VisitDetail = () => {
     const [sales, setSales] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
     const [activeTab, setActiveTab] = useState('comments'); // 'comments' or 'sales'
+
+    // Fresh client details states from Supabase
+    const [livePhone, setLivePhone] = useState(visit.phone || 'No especificado');
+    const [liveSchedule, setLiveSchedule] = useState(visit.schedule || '');
 
     useEffect(() => {
         if (!id) return;
@@ -74,14 +101,72 @@ const VisitDetail = () => {
                 }
                 setComments(fetchedComments);
 
-                // 2. Fetch sales from clients
+                // 2. Fetch sales and client details from clients
                 const { data: clientData, error: cError } = await supabase
                     .from('clients')
-                    .select('historial_ventas_completo')
+                    .select('historial_ventas_completo, numero, numero_1, numero_2, numero_3, horas_lunes, horas_martes, horas_miercoles, horas_jueves, horas_viernes, horas_sabado')
                     .eq('id_pdv', id)
                     .single();
 
-                if (!cError && clientData && clientData.historial_ventas_completo) {
+                if (!cError && clientData) {
+                    // a. Process phone numbers
+                    const phoneNumbers = [clientData.numero, clientData.numero_1, clientData.numero_2, clientData.numero_3]
+                        .map(n => String(n || '').trim())
+                        .filter(Boolean);
+                    if (phoneNumbers.length > 0) {
+                        setLivePhone(phoneNumbers.join(' / '));
+                    } else {
+                        setLivePhone('No especificado');
+                    }
+
+                    // b. Process schedule
+                    const days = [
+                        { name: 'Lunes', data: clientData.horas_lunes },
+                        { name: 'Martes', data: clientData.horas_martes },
+                        { name: 'Miércoles', data: clientData.horas_miercoles },
+                        { name: 'Jueves', data: clientData.horas_jueves },
+                        { name: 'Viernes', data: clientData.horas_viernes },
+                        { name: 'Sábado', data: clientData.horas_sabado }
+                    ];
+                    
+                    const daySchedules = days.map(d => {
+                        let hrs = d.data;
+                        if (typeof hrs === 'string') {
+                            try { hrs = JSON.parse(hrs); } catch(e) { hrs = null; }
+                        }
+                        return { name: d.name, formatted: formatHoursArray(hrs) };
+                    });
+
+                    const activeSchedules = daySchedules.filter(ds => ds.formatted);
+                    if (activeSchedules.length > 0) {
+                        const groups = {};
+                        daySchedules.forEach(ds => {
+                            if (!ds.formatted) return;
+                            if (!groups[ds.formatted]) groups[ds.formatted] = [];
+                            groups[ds.formatted].push(ds.name);
+                        });
+                        
+                        const scheduleParts = [];
+                        for (const [sched, dayNames] of Object.entries(groups)) {
+                            const shortDays = dayNames.map(n => n.slice(0, 3));
+                            const standardWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                            const indices = dayNames.map(n => standardWeek.indexOf(n)).sort((a,b) => a-b);
+                            
+                            let daysStr = '';
+                            const isConsecutive = indices.length > 1 && indices[indices.length - 1] - indices[0] === indices.length - 1;
+                            if (isConsecutive) {
+                                daysStr = `${shortDays[0]} a ${shortDays[shortDays.length - 1]}`;
+                            } else {
+                                daysStr = shortDays.join(', ');
+                            }
+                            scheduleParts.push(`${daysStr}: ${sched}`);
+                        }
+                        setLiveSchedule(scheduleParts.join(' | '));
+                    } else {
+                        setLiveSchedule('');
+                    }
+
+                    // c. Process sales history
                     let salesHistory = clientData.historial_ventas_completo;
                     if (typeof salesHistory === 'string') {
                         try {
@@ -290,7 +375,7 @@ const VisitDetail = () => {
                     </div>
 
                     {/* Schedule Block */}
-                    {schedule && (
+                    {liveSchedule && (
                         <div className="bg-[#FAF9F6] rounded-2xl p-4 flex gap-3 items-center mb-6">
                             <div className="bg-red-100 text-red-500 p-1.5 rounded-full">
                                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -299,7 +384,7 @@ const VisitDetail = () => {
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 tracking-wider uppercase mb-0.5">Horario de Atención</p>
-                                <p className="text-sm font-bold text-gray-800">{schedule}</p>
+                                <p className="text-sm font-bold text-gray-800">{liveSchedule}</p>
                             </div>
                         </div>
                     )}
@@ -312,8 +397,8 @@ const VisitDetail = () => {
                         <div className="text-right">
                             <p className="text-[10px] font-bold text-gray-400 tracking-wider uppercase mb-1">Teléfono</p>
                             <div className="flex items-center gap-2 justify-end">
-                                <p className="font-bold text-gray-800">{phone || "No especificado"}</p>
-                                {phone && (
+                                <p className="font-bold text-gray-800">{livePhone}</p>
+                                {livePhone !== 'No especificado' && (
                                     <svg className="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                                         <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/>
                                     </svg>
