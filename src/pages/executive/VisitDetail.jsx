@@ -111,7 +111,14 @@ const VisitDetail = () => {
                 if (!cError && clientData) {
                     // a. Process phone numbers
                     const phoneNumbers = [clientData.numero, clientData.numero_1, clientData.numero_2, clientData.numero_3]
-                        .map(n => String(n || '').trim())
+                        .map(n => {
+                            if (n === null || n === undefined) return '';
+                            let s = String(n).trim();
+                            if (s.endsWith('.0')) {
+                                s = s.slice(0, -2);
+                            }
+                            return s;
+                        })
                         .filter(Boolean);
                     if (phoneNumbers.length > 0) {
                         setLivePhone(phoneNumbers.join(' / '));
